@@ -113,7 +113,11 @@ export function Tv() {
               {(params) => <GroupPage library={library} groupId={params.id} onError={onError} />}
             </Route>
             <Route>
-              <Home library={library} onError={onError} />
+              <Home
+                library={library}
+                offerIntegration={!!state?.offerIntegration}
+                onError={onError}
+              />
             </Route>
           </Switch>
         )}

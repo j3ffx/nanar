@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+from nanar import demo
 from nanar.config import Settings
 from nanar.library import Library, Video
 from nanar.player import Playback, Rect, Session, SessionFactory, Start
@@ -102,6 +103,7 @@ class Controller:
         self._up_next_seconds = 0
         self._countdown: threading.Timer | None = None
         self._view: dict[str, Any] = {"path": "/", "focus": None, "seq": 0}
+        self._offer_integration = False
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -153,6 +155,7 @@ class Controller:
                 "playing": playing,
                 "upNext": up_next,
                 "view": dict(self._view),
+                "offerIntegration": self._offer_integration,
             }
 
     def library_json(self) -> dict[str, Any]:
@@ -201,6 +204,12 @@ class Controller:
             self._view = {"path": path, "focus": focus, "seq": self._view["seq"] + 1}
         self._announce()
 
+    def set_integration_offer(self, offer: bool) -> None:
+        """Whether the TV page asks to add Nanar to the Start menu and the right-click menu."""
+        with self._lock:
+            self._offer_integration = offer
+        self._announce()
+
     def set_phones(self, count: int) -> None:
         """How many phones are connected (the TV page shows it)."""
         with self._lock:
@@ -245,6 +254,7 @@ class Controller:
                 start=start,
                 rect=None,
                 fullscreen=self.settings.fullscreen,
+                length=float(demo.SECONDS) if "://" in video.path else None,
             )
             if self._session is not None:
                 # The same window: no flicker between two episodes.
@@ -255,7 +265,14 @@ class Controller:
                 self._generation += 1
                 self._playback = Playback(fullscreen=self.settings.fullscreen)
                 self._session = self._sessions(
-                    Start(begin.source, begin.title, begin.start, rect, begin.fullscreen),
+                    Start(
+                        begin.source,
+                        begin.title,
+                        begin.start,
+                        rect,
+                        begin.fullscreen,
+                        begin.length,
+                    ),
                     self.settings,
                     _SessionCallbacks(self, self._generation),
                 )

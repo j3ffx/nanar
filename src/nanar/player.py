@@ -98,6 +98,9 @@ class Start:
     start: float = 0.0
     rect: Rect | None = None
     fullscreen: bool = False
+    # The length of a generated video (the demo's): its stream never says, and mpv's guess
+    # grows as it plays.
+    length: float | None = None
 
 
 class Callbacks(Protocol):
@@ -350,7 +353,8 @@ class MpvSession:
                 # Where the window is, once a second: once it is closed, it is too late to ask.
                 self._last_rect = self.rect() or self._last_rect
             case "duration":
-                p.duration = float(value) if value is not None else None
+                known = self._start.length
+                p.duration = known or (float(value) if value is not None else None)
             case "pause":
                 p.paused = bool(value)
             case "volume":

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import segno
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
@@ -39,6 +39,29 @@ class ViewBody(BaseModel):
     focus: str | None = None  # the video or group to put forward
 
 
+class OpenBody(BaseModel):
+    path: str | None = None  # a folder to open
+    choose: bool = False  # or ask for one with the system's folder picker
+
+
+class IntegrationBody(BaseModel):
+    install: bool
+
+
+class Desktop(Protocol):
+    """What only this machine may ask for: its folders, its window, its Start menu."""
+
+    def open(self, folder: str) -> None: ...
+
+    def choose(self) -> str | None:
+        """The system's folder picker; None when cancelled."""
+
+    def bring_to_front(self) -> None: ...
+
+    def integrate(self, install: bool) -> None:
+        """Adds (or not) Nanar to the Start menu and to the folders' right-click menu."""
+
+
 class PairBody(BaseModel):
     key: str
 
@@ -58,7 +81,9 @@ def static_dir() -> Path:
     return Path(str(files("nanar"))) / "web" / "static"
 
 
-def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI:
+def create_app(
+    controller: Controller, *, key: str, network: Network, desktop: Desktop | None = None
+) -> FastAPI:
     app = FastAPI(title="Nanar", version=__version__, docs_url=None, redoc_url=None)
     app.add_middleware(AccessMiddleware, key=key)
     phones: set[WebSocket] = set()
@@ -103,6 +128,35 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
     @app.post("/api/view", status_code=204)
     async def view(body: ViewBody) -> None:
         controller.set_view(body.path, body.focus)
+
+    @app.post("/api/open", status_code=204, response_model=None)
+    async def open_folder(body: OpenBody, request: Request) -> JSONResponse | None:
+        """Opens a folder (a second launch hands its folder over this way, the TV page's
+        button asks for one), and brings Nanar's window to the front."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        if desktop is None:
+            raise CommandError("no_window")
+        here = desktop
+
+        def run() -> None:
+            folder = here.choose() if body.choose else body.path
+            if folder:
+                here.open(folder)
+            here.bring_to_front()
+
+        await asyncio.to_thread(run)
+        return None
+
+    @app.post("/api/integration", status_code=204, response_model=None)
+    async def integration(body: IntegrationBody, request: Request) -> JSONResponse | None:
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        if desktop is None:
+            raise CommandError("no_window")
+        await asyncio.to_thread(desktop.integrate, body.install)
+        controller.set_integration_offer(False)
+        return None
 
     @app.post("/api/pair", response_model=None)
     async def pair(body: PairBody) -> Response:

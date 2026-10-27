@@ -27,7 +27,10 @@ NAMES = [
 _HUES = [0, 40, 80, 120, 160, 200, 240, 280, 320]
 
 
-def source(index: int, seconds: int = 300) -> str:
+SECONDS = 300  # each made-up video lasts five minutes
+
+
+def source(index: int, seconds: int = SECONDS) -> str:
     """A video mpv generates (test pattern and a tone), with a French and an English track."""
     hue = _HUES[index % len(_HUES)]
     video = f"testsrc2=size=1280x720:rate=25:duration={seconds},hue=h={hue}"

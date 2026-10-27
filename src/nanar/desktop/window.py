@@ -77,6 +77,21 @@ class TvWindow:
                 self._fullscreen = fullscreen
                 self.window.toggle_fullscreen()
 
+    # The desktop -------------------------------------------------------------------------------
+
+    def choose_folder(self) -> str | None:
+        """The system's folder picker, over Nanar's window; None when cancelled."""
+        chosen = self.window.create_file_dialog(self._webview.FileDialog.FOLDER)
+        return str(chosen[0]) if chosen else None
+
+    def bring_to_front(self) -> None:
+        """Back in front (from behind other windows, or minimised)."""
+        if sys.platform == "win32" and (hwnd := self._hwnd()) is not None:
+            from nanar.desktop import win32
+
+            win32.restore(hwnd)
+            win32.bring_to_front(hwnd)
+
     def _hwnd(self) -> int | None:
         native = getattr(self.window, "native", None)
         handle = getattr(native, "Handle", None)

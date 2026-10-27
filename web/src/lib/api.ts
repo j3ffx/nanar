@@ -76,6 +76,8 @@ export interface State {
   upNext: UpNext | null;
   /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
   view: { path: string; focus: string | null; seq: number };
+  /** The Windows build asks once to add Nanar to the Start menu and the right-click menu. */
+  offerIntegration: boolean;
 }
 
 export interface Pairing {
@@ -112,6 +114,12 @@ export const command = (action: string, value?: unknown) =>
   send('/api/command', { action, value: value ?? null });
 
 export const pair = (key: string) => send('/api/pair', { key });
+
+/** This machine only: asks for a folder with the system's picker, and opens it. */
+export const chooseFolder = () => send('/api/open', { choose: true });
+
+/** This machine only: adds (or not) Nanar to the Start menu and the right-click menu. */
+export const answerIntegration = (install: boolean) => send('/api/integration', { install });
 
 /** Tells the TV what this phone looks at: the TV page's path ("/", "/g/<id>") and an item. */
 export const setView = (path: string, focus: string | null = null) =>

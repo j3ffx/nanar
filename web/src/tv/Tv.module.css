@@ -205,6 +205,49 @@
   color: var(--text-muted);
 }
 
+.offer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0 0;
+  padding: 16px 22px;
+  border-radius: var(--radius);
+  background: rgb(29 21 40 / 0.86);
+  font-size: clamp(1rem, 1.3vw, 1.3rem);
+}
+
+.offer p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+.offer button,
+.folder button {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.offer button:first-of-type {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 40px 0 0;
+  color: var(--text-muted);
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+  overflow-wrap: anywhere;
+}
+
 .hints {
   position: relative;
   z-index: 1;

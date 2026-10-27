@@ -236,3 +236,70 @@ def test_the_tv_follows_what_a_phone_looks_at(client: TestClient, phone: TestCli
 def test_serves_the_pictures_it_has(client: TestClient) -> None:
     assert client.get("/api/thumb/v/nope").status_code == 404
     assert client.get("/api/thumb/x/nope").status_code == 404
+
+
+class FakeDesktop:
+    def __init__(self) -> None:
+        self.opened: list[str] = []
+        self.fronted = 0
+        self.integrated: list[bool] = []
+        self.picked: str | None = "/picked"
+
+    def open(self, folder: str) -> None:
+        self.opened.append(folder)
+
+    def choose(self) -> str | None:
+        return self.picked
+
+    def bring_to_front(self) -> None:
+        self.fronted += 1
+
+    def integrate(self, install: bool) -> None:
+        self.integrated.append(install)
+
+
+def desktop_app(controller: Controller, desktop: FakeDesktop) -> tuple[TestClient, TestClient]:
+    app = create_app(controller, key=KEY, network=Network(port=8642), desktop=desktop)
+    tv = TestClient(app, base_url="http://127.0.0.1:8642", client=TV)
+    phone = TestClient(app, base_url="http://192.168.1.10:8642", client=PHONE)
+    return tv, phone
+
+
+def test_a_second_launch_hands_its_folder_over(controller: Controller) -> None:
+    desktop = FakeDesktop()
+    tv, _ = desktop_app(controller, desktop)
+    assert tv.post("/api/open", json={"path": "D:/Films"}).status_code == 204
+    assert desktop.opened == ["D:/Films"]
+    assert desktop.fronted == 1
+    assert tv.post("/api/open", json={}).status_code == 204  # no folder: just to the front
+    assert desktop.opened == ["D:/Films"]
+
+
+def test_the_tv_page_asks_for_a_folder_with_the_system_picker(controller: Controller) -> None:
+    desktop = FakeDesktop()
+    tv, _ = desktop_app(controller, desktop)
+    tv.post("/api/open", json={"choose": True})
+    assert desktop.opened == ["/picked"]
+    desktop.picked = None  # cancelled
+    tv.post("/api/open", json={"choose": True})
+    assert desktop.opened == ["/picked"]
+
+
+def test_only_this_machine_opens_folders_or_touches_menus(controller: Controller) -> None:
+    desktop = FakeDesktop()
+    _, phone = desktop_app(controller, desktop)
+    pair(phone)
+    assert phone.post("/api/open", json={"path": "C:/"}).json() == {"code": "this_machine_only"}
+    assert phone.post("/api/integration", json={"install": True}).status_code == 403
+    assert desktop.opened == []
+    assert desktop.integrated == []
+
+
+def test_answering_the_menus_offer_hides_it(controller: Controller) -> None:
+    desktop = FakeDesktop()
+    tv, _ = desktop_app(controller, desktop)
+    controller.set_integration_offer(True)
+    assert tv.get("/api/state").json()["offerIntegration"] is True
+    assert tv.post("/api/integration", json={"install": False}).status_code == 204
+    assert desktop.integrated == [False]
+    assert tv.get("/api/state").json()["offerIntegration"] is False

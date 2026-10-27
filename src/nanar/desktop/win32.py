@@ -44,6 +44,11 @@ user32.LoadImageW.argtypes = [
 user32.LoadImageW.restype = wintypes.HANDLE
 user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
 user32.SendMessageW.restype = wintypes.LPARAM
+user32.IsIconic.argtypes = [wintypes.HWND]
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.AllowSetForegroundWindow.argtypes = [wintypes.DWORD]
+_SW_RESTORE = 9
+_ASFW_ANY = 0xFFFFFFFF
 _IMAGE_ICON = 1
 _LR_LOADFROMFILE = 0x0010
 _WM_SETICON = 0x0080
@@ -115,3 +120,15 @@ def place_window(hwnd: int, rect: Rect) -> None:
 
 def bring_to_front(hwnd: int) -> None:
     user32.SetForegroundWindow(hwnd)
+
+
+def restore(hwnd: int) -> None:
+    """Un-minimises a window (and leaves a visible one as it is)."""
+    if user32.IsIconic(hwnd):
+        user32.ShowWindow(hwnd, _SW_RESTORE)
+
+
+def allow_any_foreground() -> None:
+    """Lets another process (the Nanar already open) come to the front: Windows only allows it
+    to the process the user just started, which is this one."""
+    user32.AllowSetForegroundWindow(_ASFW_ANY)

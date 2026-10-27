@@ -27,6 +27,8 @@ class Settings:
 
     last_folder: str | None = None
     fullscreen: bool = False
+    # The Start menu and right-click entries were offered once (yes or no): not again.
+    integration_answered: bool = False
     # Languages tried in order, for the audio and for the subtitles (ISO 639 codes and the
     # names release groups use). Subtitles in the language of the audio are left off.
     audio_languages: list[str] = field(default_factory=lambda: ["fr", "fre", "fra", "en", "eng"])
