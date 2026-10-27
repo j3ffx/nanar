@@ -120,4 +120,5 @@ def main() -> None:
         from nanar.desktop import win32
 
         win32.declare_dpi_aware()
+        win32.declare_app_id()
     cli()

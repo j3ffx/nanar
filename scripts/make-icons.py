@@ -10,7 +10,9 @@ import struct
 import zlib
 from pathlib import Path
 
-PUBLIC = Path(__file__).resolve().parent.parent / "web" / "public"
+ROOT = Path(__file__).resolve().parent.parent
+PUBLIC = ROOT / "web" / "public"
+ASSETS = ROOT / "src" / "nanar" / "assets"
 
 BACKGROUND = (0x12, 0x0D, 0x1A)
 POPCORN = (0xFF, 0xC2, 0x3D)
@@ -99,6 +101,19 @@ def png(size: int, raw: bytes) -> bytes:
     )
 
 
+def ico(images: list[tuple[int, bytes]]) -> bytes:
+    """A Windows icon holding PNG images (accepted since Windows Vista)."""
+    header = struct.pack("<HHH", 0, 1, len(images))
+    offset = 6 + 16 * len(images)
+    entries, data = b"", b""
+    for size, image in images:
+        side = 0 if size >= 256 else size  # 0 means 256
+        entries += struct.pack("<BBBBHHII", side, side, 0, 0, 1, 32, len(image), offset)
+        offset += len(image)
+        data += image
+    return header + entries + data
+
+
 def main() -> None:
     # Android masks icons itself; iOS rounds them too: the square is drawn full (radius ~0).
     for name, size, radius in [
@@ -108,6 +123,10 @@ def main() -> None:
     ]:
         (PUBLIC / name).write_bytes(draw(size, radius=radius))
         print(f"{name} ({size}×{size})")
+    # Nanar's windows and, later, its executable.
+    sizes = [16, 24, 32, 48, 256]
+    (ASSETS / "nanar.ico").write_bytes(ico([(s, draw(s, radius=14.0)) for s in sizes]))
+    print(f"nanar.ico ({', '.join(map(str, sizes))})")
 
 
 if __name__ == "__main__":

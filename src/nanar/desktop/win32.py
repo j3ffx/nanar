@@ -7,6 +7,7 @@ DPI-aware: WebView2 and mpv both declare it).
 import ctypes
 import sys
 from ctypes import wintypes
+from pathlib import Path
 
 from nanar.player import Rect
 
@@ -32,6 +33,22 @@ user32.SetWindowPos.argtypes = [
     wintypes.UINT,
 ]
 _SWP_NOZORDER = 0x0004
+user32.LoadImageW.argtypes = [
+    wintypes.HINSTANCE,
+    wintypes.LPCWSTR,
+    wintypes.UINT,
+    ctypes.c_int,
+    ctypes.c_int,
+    wintypes.UINT,
+]
+user32.LoadImageW.restype = wintypes.HANDLE
+user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+user32.SendMessageW.restype = wintypes.LPARAM
+_IMAGE_ICON = 1
+_LR_LOADFROMFILE = 0x0010
+_WM_SETICON = 0x0080
+_ICON_SMALL = 0
+_ICON_BIG = 1
 
 
 def find_window(pid: int, class_name: str) -> int | None:
@@ -72,6 +89,24 @@ def declare_dpi_aware() -> None:
     per_monitor_v2 = ctypes.c_void_p(-4)
     user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
     user32.SetProcessDpiAwarenessContext(per_monitor_v2)
+
+
+ICON = Path(__file__).resolve().parent.parent / "assets" / "nanar.ico"
+
+
+def declare_app_id() -> None:
+    """Groups Nanar's windows under its own taskbar button, not Python's."""
+    shell32 = ctypes.WinDLL("shell32")
+    shell32.SetCurrentProcessExplicitAppUserModelID.argtypes = [wintypes.LPCWSTR]
+    shell32.SetCurrentProcessExplicitAppUserModelID("Nanar.Player")
+
+
+def set_icon(hwnd: int) -> None:
+    """Gives a window Nanar's icon (title bar, Alt+Tab, taskbar) instead of python.exe's."""
+    for which, size in ((_ICON_SMALL, 16), (_ICON_BIG, 32)):
+        icon = user32.LoadImageW(None, str(ICON), _IMAGE_ICON, size, size, _LR_LOADFROMFILE)
+        if icon:
+            user32.SendMessageW(hwnd, _WM_SETICON, which, icon)
 
 
 def place_window(hwnd: int, rect: Rect) -> None:

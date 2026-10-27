@@ -279,16 +279,20 @@ class MpvSession:
         return win32.window_rect_of_process(os.getpid(), "mpv")
 
     def _place(self) -> None:
-        """Lays mpv's window exactly over Nanar's. `geometry` only comes close: mpv reads its
-        size as the inside of the window, and Windows adds the frame around it."""
+        """Gives mpv's window Nanar's icon, and lays it exactly over Nanar's. `geometry` only
+        comes close: mpv reads its size as the inside of the window, and Windows adds the frame
+        around it."""
         self._placed = True
-        target = self._start.rect
-        if sys.platform != "win32" or target is None or self._start.fullscreen:
+        if sys.platform != "win32":
             return
         from nanar.desktop import win32
 
         hwnd = win32.find_window(os.getpid(), "mpv")
-        if hwnd is not None:
+        if hwnd is None:
+            return
+        win32.set_icon(hwnd)
+        target = self._start.rect
+        if target is not None and not self._start.fullscreen:
             win32.place_window(hwnd, target)
 
     def close(self) -> None:

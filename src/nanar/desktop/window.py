@@ -21,7 +21,7 @@ class TvWindow:
         self._webview = webview
         self._fullscreen = fullscreen
         self._lock = threading.Lock()
-        self.window: Any = webview.create_window(
+        window = webview.create_window(
             "Nanar",
             url,
             width=1280,
@@ -31,6 +31,15 @@ class TvWindow:
             background_color=BACKGROUND,
             text_select=False,
         )
+        assert window is not None
+        window.events.shown += self._on_shown
+        self.window: Any = window
+
+    def _on_shown(self) -> None:
+        if sys.platform == "win32" and (hwnd := self._hwnd()) is not None:
+            from nanar.desktop import win32
+
+            win32.set_icon(hwnd)
 
     def run(self, on_ready: Callable[[], None] | None = None) -> None:
         """Runs the GUI loop on this (main) thread until the window is closed."""
