@@ -7,10 +7,18 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> **En construction.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
-> lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes. Reste à en faire une
-> version qui s’installe d’un clic sous Windows. Ce que chaque version apporte : le
+> **Première version.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton
+> téléphone, lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes. Pour
+> Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte : le
 > [journal des changements](CHANGELOG.md).
+
+![L’accueil sur la télé, en mode démo : les sagas et les séries, les films, et le QR code qui
+transforme le téléphone en télécommande](docs/capture-tele.png)
+
+<p align="center">
+  <img src="docs/capture-bibliotheque.png" width="280" alt="La bibliothèque sur le téléphone">
+  <img src="docs/capture-telecommande.png" width="280" alt="La télécommande pendant un épisode">
+</p>
 
 ## Ce que fait Nanar
 
@@ -37,15 +45,33 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 - **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques, pas même une jaquette
   téléchargée : tout vient de tes fichiers.
 
-## Essayer
+## Installer
 
-Pour l’instant, Nanar se lance depuis ses sources (une version prête à installer pour Windows
-viendra avec la 0.1.0). Il faut [uv](https://docs.astral.sh/uv/) et [Node.js](https://nodejs.org/)
-22 :
+Sur **Windows 10 ou 11** :
+
+1. Télécharge `nanar-x.y.z-windows.zip` depuis
+   [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
+2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
+   **`Nanar.exe`**. Rien d’autre à installer.
+3. Nanar n’est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Clique sur
+   « Informations complémentaires », puis « Exécuter quand même ».
+4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : accepte pour les
+   **réseaux privés**, sinon le téléphone ne trouvera pas le PC.
+5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
+   clic droit sur les dossiers (« Ouvrir avec Nanar ») : c’est toi qui décides.
+
+Le fichier `.sha256` à côté du zip permet de vérifier qu’il n’a pas été altéré. Tes réglages, ta
+progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier de Nanar :
+pour une nouvelle version, remplace simplement le dossier.
+
+### Depuis les sources
+
+Sur Linux, macOS, ou pour contribuer. Il faut [uv](https://docs.astral.sh/uv/),
+[Node.js](https://nodejs.org/) 22 et libmpv (`apt install libmpv2`, `brew install mpv` ; sous
+Windows, `scripts/get-libmpv.py` le télécharge) :
 
 ```bash
 npm ci && uv sync
-uv run python scripts/get-libmpv.py
 npm run build
 uv run nanar D:\Films
 ```
@@ -63,11 +89,8 @@ Nanar s’annonce sur le réseau sous le nom **`nanar.local`** : quand ton tél�
 nom (les iPhone toujours, Android selon sa version), la télécommande passe à l’adresse
 `http://nanar.local:8642`, qui ne change pas d’un Wi-Fi à l’autre (si elle n’y passe pas toute
 seule, elle propose un bouton « Ouvrir nanar.local »). Ajoute-la à l’écran d’accueil depuis cette
-adresse : l’icône marchera alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau où tu l’as ajoutée, et
-il faut rescanner le QR code sur un autre Wi-Fi.
-
-Au premier lancement, Windows demande s’il faut laisser Nanar communiquer sur le réseau : accepte
-pour les **réseaux privés**. Sans cette autorisation, le téléphone ne trouve pas le PC.
+adresse : l’icône marchera alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau
+où tu l’as ajoutée, et il faut rescanner le QR code sur un autre Wi-Fi.
 
 Nanar ne parle qu’au réseau local, jamais à Internet. Seul un téléphone qui a scanné le code de ta
 télé peut le piloter ; `nanar --new-key` change le code (les téléphones déjà appairés devront le
@@ -115,6 +138,7 @@ Les règles du dépôt (commandes, commits, confidentialité, invariants) : [CLA
 - QR code : [segno](https://github.com/heuer/segno) (BSD) ; `nanar.local` :
   [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf) (LGPL 2.1 ou plus).
 - Police [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (SIL Open Font License).
+- La version Windows est assemblée par [PyInstaller](https://pyinstaller.org/).
 
 ## Licence
 
