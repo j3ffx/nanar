@@ -163,7 +163,6 @@ class MpvSession:
             "osc": True,
             "alang": ",".join(settings.audio_languages),
             "slang": ",".join(settings.subtitle_languages),
-            "subs_with_matching_audio": "forced",
             "sub_auto": "fuzzy",
             "audio_file_auto": "no",
             "hwdec": "auto-safe",
@@ -174,6 +173,12 @@ class MpvSession:
             r = start.rect
             options["geometry"] = f"{r.width}x{r.height}+{r.x}+{r.y}"
         self._mpv = mpv.MPV(**(options | self.overrides))
+        # No subtitles in the audio's language, but the forced ones (signs, a foreign line).
+        # libmpv before 0.38 only knows yes/no: there, none at all.
+        try:
+            self._mpv["subs-with-matching-audio"] = "forced"
+        except (ValueError, TypeError, RuntimeError):  # python-mpv's errors for a refused value
+            self._mpv["subs-with-matching-audio"] = "no"
         for key, command in KEY_BINDINGS.items():
             self._mpv.command("keybind", key, command)
         self._mpv.register_message_handler("nanar", self._on_message)
