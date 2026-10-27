@@ -14,3 +14,8 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
   Plein écran avec `F` (retenu d’une fois sur l’autre), et les touches de VLC.
 - VF d’abord, sinon VO avec les sous-titres français.
 - Un mode démo (`nanar --demo`) avec une bibliothèque factice.
+- La télécommande sur le téléphone : scanne le QR code de la télé, et c’est parti (Android et
+  iPhone, rien à installer). Lecture, pause, ±10 s, ±1 min, épisode suivant ou précédent, arrêt,
+  volume, pistes audio et sous-titres, décalage et taille des sous-titres, plein écran. La télé
+  affiche chaque action, et combien de téléphones sont connectés.
+- `nanar --new-key` change le QR code, `nanar --local` coupe la télécommande.

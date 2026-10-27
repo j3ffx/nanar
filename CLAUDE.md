@@ -73,9 +73,17 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - **Languages:** French audio first, then English; French subtitles, left off when the audio is
   already French (forced ones excepted). `Settings` holds the lists.
 - **Local and private.** No telemetry, no account, no request to the Internet: the library is read
-  from file names only. Until phones pair with a token shown on the TV, the server listens on
-  `127.0.0.1` only, refuses a `Host` that isn't loopback (DNS rebinding) and requires a JSON body for
-  anything that changes state (another website open in a browser can't drive it).
+  from file names only. The server listens on the local network for the phones; who may call what
+  is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
+  rebinding), or a phone carrying the pairing key (`nanar_key` cookie, `HttpOnly`,
+  `SameSite=Strict`, or a Bearer header). Anything that changes state needs a JSON body; no CORS
+  header is ever granted; a WebSocket must come from the page's own origin.
+- **Pairing:** one key per installation (`pairing.py`), shown on the TV as a QR code whose URL
+  carries it in the fragment (never sent to a server or logged). Whoever sees the TV may pair: that
+  is the point. `--new-key` unpairs every phone, `--local` listens on loopback only. A paired
+  phone's manifest start URL carries the key, so that an iPhone home screen icon (cookies of its
+  own) is paired too.
+- **The phone's actions show on the TV** (mpv's OSD, `osd=True`); mpv's own keys already do.
 - **User data lives outside the repository**, in the OS data directory (`platformdirs`), overridable
   with `NANAR_DATA_DIR`. The demo keeps its own (`demo/` inside it).
 - **The desktop side asks before touching the system.** Nothing is written to the registry or the
@@ -89,12 +97,14 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 
 - `src/nanar/`: Python package. `library.py` (reading release names with guessit, sagas and
   series), `player.py` (one mpv window per video, VLC-like keys), `controller.py` (the single place
-  where state changes), `app.py` (API, WebSocket, pages), `desktop/` (the pywebview window, Win32
+  where state changes), `app.py` (API, WebSocket, pages, manifest), `security.py` and
+  `pairing.py` (who may drive Nanar), `desktop/` (the pywebview window, Win32
   calls placing windows), `demo.py` (made-up library played from mpv's `lavfi` sources), `cli.py`.
   `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
   real libmpv without video or sound).
 - `web/`: the pages (Vite, React, CSS Modules, wouter). `/tv` is the TV page (`src/tv/`, arrow-key
-  navigation in `src/lib/spatial.ts`), `/` the phone's page (`src/remote/`). `npm run build` writes
+  navigation in `src/lib/spatial.ts`), `/` the phone's page (`src/remote/`: pairing, then the remote). `public/` holds the
+  icons; `scripts/make-icons.py` draws the PNG ones. `npm run build` writes
   them into `src/nanar/web/static/` (ignored), which the Python package serves and ships.
 - `scripts/`: repository checks, git hook helpers, `get-libmpv.py` (pinned libmpv build for Windows).
 
