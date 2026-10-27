@@ -249,9 +249,9 @@ class MpvSession:
             fullscreen=self._playback.fullscreen, volume=self._playback.volume
         )
         self._mpv["title"] = f"{start.title} — Nanar"
-        self._mpv["start"] = f"{start.start:.3f}"
-        self._mpv.pause = False
-        self._mpv.play(start.source)
+        # Options of this file only. At the end of the previous one, mpv paused on its last
+        # picture (keep-open): unpausing before loading would only pause it again.
+        self._mpv.loadfile(start.source, "replace", start=f"{start.start:.3f}", pause="no")
 
     def message(self, text: str, seconds: float) -> None:
         self._mpv.command("show-text", text, int(seconds * 1000))

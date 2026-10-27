@@ -89,6 +89,7 @@ def test_reports_the_end_and_plays_the_next_video_in_the_same_window() -> None:
         assert not recorder.done.is_set()  # mpv stays open on the last picture
         recorder.at_end.clear()
         session.load(Start(demo.source(2, 1), "Suite"))
+        recorder.wait(lambda p: p.position > 0.2 and not p.paused)  # plays, not left paused
         assert recorder.at_end.wait(15)
     finally:
         session.close()
