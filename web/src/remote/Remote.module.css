@@ -1,0 +1,26 @@
+.page {
+  display: grid;
+  gap: 12px;
+  place-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  text-align: center;
+}
+
+.logo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.status {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-muted);
+}

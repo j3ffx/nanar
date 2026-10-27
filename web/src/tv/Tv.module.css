@@ -1,0 +1,191 @@
+.tv {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+}
+
+/* Nobody has touched anything for a while: the screen dims, like a theatre between shows. */
+.tv::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 4s ease;
+}
+
+.tv[data-dim]::after {
+  opacity: 0.72;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  padding: 8px clamp(24px, 5vw, 80px) 32px;
+  scroll-padding: 40px;
+}
+
+.loading {
+  font-size: 1.6rem;
+  color: var(--text-muted);
+}
+
+.section {
+  margin: 28px 0 18px;
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 13vw, 240px), 1fr));
+  gap: clamp(20px, 2.4vw, 40px);
+  padding: 16px 16px 8px 0;
+}
+
+.empty {
+  display: grid;
+  gap: 8px;
+  place-content: center;
+  min-height: 50vh;
+  text-align: center;
+  font-size: 1.3rem;
+  color: var(--text-muted);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.back {
+  justify-self: center;
+  margin-top: 16px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 24px 0 24px;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.5vw, 3.4rem);
+  font-weight: 800;
+  font-stretch: 85%;
+}
+
+.groupCount {
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 24px;
+  list-style: none;
+  max-width: 1100px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 5.5em 1fr auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 24px;
+  border: 0;
+  border-radius: var(--radius);
+  background: rgb(29 21 40 / 0.78);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  text-align: left;
+  font-size: clamp(1.1rem, 1.5vw, 1.5rem);
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: rgb(52 36 70 / 0.92);
+  transform: translateX(8px);
+}
+
+.row:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 0;
+}
+
+.rowNumber {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.rowTitle {
+  font-weight: 600;
+}
+
+.rowDetail {
+  color: var(--text-muted);
+}
+
+.hints {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 32px;
+  padding: 12px clamp(24px, 5vw, 80px) 20px;
+  color: var(--text-muted);
+  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+}
+
+.hints kbd {
+  display: inline-block;
+  min-width: 1.8em;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  border: 1px solid rgb(255 255 255 / 0.15);
+  color: var(--text);
+  font-family: inherit;
+  text-align: center;
+}
+
+.error {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  z-index: 20;
+  translate: -50% 0;
+  margin: 0;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: var(--cherry);
+  color: #1a0710;
+  font-weight: 700;
+  font-size: 1.2rem;
+}

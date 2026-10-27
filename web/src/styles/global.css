@@ -1,0 +1,71 @@
+@import '@fontsource-variable/bricolage-grotesque';
+
+:root {
+  /* Night at the drive-in: a deep plum screen, popcorn yellow, a cherry-red ticket. */
+  --bg: #120d1a;
+  --bg-raised: #1d1528;
+  --bg-sunk: #0b0811;
+  --text: #f6efe4;
+  --text-muted: #c4b8d3; /* 9:1 on --bg */
+  --accent: #ffc23d; /* popcorn */
+  --accent-ink: #1d1206; /* text on --accent */
+  --cherry: #ff5c7a;
+  --focus: #ffc23d;
+  --radius: 14px;
+  --font-display: 'Bricolage Grotesque Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Bricolage Grotesque Variable', 'Segoe UI', system-ui, sans-serif;
+
+  color-scheme: dark;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,83 @@
+.header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(24px, 4vh, 48px) clamp(24px, 5vw, 80px) 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(16px, 2vw, 32px);
+  flex-wrap: wrap;
+}
+
+.logo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5.5vw, 5rem);
+  font-weight: 800;
+  font-stretch: 75%;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+  text-shadow: 0 0 40px rgb(255 194 61 / 0.25);
+}
+
+.dot {
+  color: var(--accent);
+  display: inline-block;
+  animation: blink 3.2s ease-in-out infinite;
+}
+
+.tagline {
+  margin: 0;
+  font-size: clamp(1rem, 1.6vw, 1.5rem);
+  color: var(--text-muted);
+  font-style: italic;
+  animation: roll-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.side {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.clock {
+  font-size: clamp(1.2rem, 2vw, 2rem);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.demo {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--cherry);
+  color: #1a0710;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+}
+
+@keyframes blink {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+}

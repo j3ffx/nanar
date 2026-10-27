@@ -1,0 +1,30 @@
+{
+  "name": "nanar-repo",
+  "private": true,
+  "description": "Repository tooling for Nanar: git hooks, privacy and commit checks, formatting.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare": "node scripts/setup-hooks.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w web",
+    "typecheck": "npm run typecheck -w web",
+    "lint": "npm run lint -w web",
+    "test": "npm test -w web",
+    "check": "npm run check:private && npm run format:check && npm run typecheck && npm run lint && npm test && uv run ruff check && uv run ruff format --check && uv run mypy --platform win32 && uv run mypy --platform linux && uv run pytest -q",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:private": "node scripts/check-tracked.mjs",
+    "check:commits": "node scripts/check-commits.mjs",
+    "fix:dates": "node scripts/commit-date.mjs --fix"
+  },
+  "workspaces": [
+    "web"
+  ],
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}

@@ -1,0 +1,64 @@
+[project]
+name = "nanar"
+version = "0.0.0"
+description = "Tes films sur la télé, la télécommande dans le téléphone : un lecteur vidéo pour PC piloté depuis le canapé."
+readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "guessit>=4.4.0",
+    "platformdirs>=4.13.6",
+    "python-mpv>=1.0.8",
+    "pywebview>=6.2.1",
+    "segno>=1.6.6",
+    "typer>=0.27.3",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+nanar = "nanar.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+# The built UI is ignored by git but ships in the package (sdist and wheel alike).
+artifacts = ["src/nanar/web/static/**"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nanar"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.1",
+    "pytest-timeout>=2.4.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT", "C4", "PIE", "RET"]
+ignore = ["RUF001", "RUF002", "RUF003"] # French text has non-ASCII quotes and apostrophes
+
+[tool.mypy]
+strict = true
+files = ["src", "tests", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# libmpv's Lua scripts (LuaJIT) raise and catch Windows exceptions of their own, which pytest's
+# faulthandler would print as "fatal" although they are handled; pytest-timeout still catches hangs.
+addopts = "-p no:faulthandler"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# A hung test fails with its stack after this long instead of stalling the whole run.
+timeout = 60

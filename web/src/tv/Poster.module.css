@@ -1,0 +1,101 @@
+.poster {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.25s;
+  filter: saturate(0.85) brightness(0.92);
+}
+
+/* A saga or a series: the next posters peek out from behind. */
+.poster[data-stacked]::before,
+.poster[data-stacked]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  background: hsl(var(--hue) 45% 28%);
+  transform: translate(8px, -8px);
+  z-index: -1;
+}
+
+.poster[data-stacked]::after {
+  background: hsl(var(--hue) 40% 20%);
+  transform: translate(16px, -16px);
+  z-index: -2;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: clamp(12px, 1.2vw, 20px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 20%, hsl(calc(var(--hue) + 40) 80% 60% / 0.55), transparent 55%),
+    linear-gradient(160deg, hsl(var(--hue) 55% 34%), hsl(calc(var(--hue) + 30) 60% 14%));
+  box-shadow:
+    0 12px 30px rgb(0 0 0 / 0.45),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+/* A strip of film perforations along the top, for the look. */
+.face::before {
+  content: '';
+  position: absolute;
+  inset: 10px 10px auto;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.18) 0 10px,
+    transparent 10px 20px
+  );
+  border-radius: 2px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.5vw, 1.6rem);
+  font-weight: 750;
+  font-stretch: 85%;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 0.5);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.detail {
+  font-size: clamp(0.85rem, 1vw, 1.05rem);
+  color: rgb(255 255 255 / 0.85);
+}
+
+.poster:hover,
+.poster:focus-visible {
+  transform: scale(1.07);
+  filter: none;
+  z-index: 1;
+}
+
+.poster:focus-visible {
+  outline: none;
+}
+
+.poster:focus-visible .face {
+  box-shadow:
+    0 0 0 4px var(--focus),
+    0 0 40px rgb(255 194 61 / 0.45),
+    0 18px 40px rgb(0 0 0 / 0.55);
+}
