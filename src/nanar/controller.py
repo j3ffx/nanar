@@ -13,12 +13,15 @@ import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from nanar.config import Settings
 from nanar.library import Library, Video
 from nanar.player import Playback, Rect, Session, SessionFactory, Start
 from nanar.progress import Progress
+
+if TYPE_CHECKING:
+    from nanar.thumbnails import Thumbnails
 
 Listener = Callable[[dict[str, Any]], None]
 
@@ -74,12 +77,14 @@ class Controller:
         window: WindowHost | None = None,
         *,
         progress: Progress | None = None,
+        thumbnails: "Thumbnails | None" = None,
         demo: bool = False,
     ) -> None:
         self.library = library
         self.settings = settings
         self.window: WindowHost = window or NoWindow()
         self.progress = progress or Progress(None)
+        self.thumbnails = thumbnails
         self._settings_path = settings_path
         self._sessions = sessions
         self._demo = demo
@@ -153,7 +158,10 @@ class Controller:
         with self._lock:
             data = self.library.to_json()
             saved = self.progress.of_root(self.library.root)
+            for group_id in self.library.groups:
+                data["groups"][group_id]["thumb"] = self._thumb_url("g", group_id)
             for video in self.library.videos.values():
+                data["videos"][video.id]["thumb"] = self._thumb_url("v", video.id)
                 entry = saved.get(video.path)
                 data["videos"][video.id]["progress"] = (
                     {
@@ -165,6 +173,22 @@ class Controller:
                     else None
                 )
             return data
+
+    def thumbnail(self, kind: str, ident: str) -> Path | None:
+        """The picture of a video ("v") or of a saga or series ("g"), if there is one."""
+        if self.thumbnails is None:
+            return None
+        if kind == "g":
+            return self.thumbnails.of_group(self.library, ident)
+        video = self.library.videos.get(ident)
+        return self.thumbnails.of_video(self.library, video) if video else None
+
+    def _thumb_url(self, kind: str, ident: str) -> str | None:
+        path = self.thumbnail(kind, ident)
+        if path is None:
+            return None
+        # The file's age in the URL: a new picture is a new address, and caches stay right.
+        return f"/api/thumb/{kind}/{ident}?v={int(path.stat().st_mtime)}"
 
     def set_phones(self, count: int) -> None:
         """How many phones are connected (the TV page shows it)."""
@@ -179,6 +203,8 @@ class Controller:
         with self._lock:
             self.library = library
             self._library_version += 1
+        if self.thumbnails is not None:
+            self.thumbnails.schedule(library)
         self._announce()
 
     def library_changed(self) -> None:

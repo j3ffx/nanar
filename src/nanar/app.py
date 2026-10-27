@@ -77,6 +77,14 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
     async def library() -> dict[str, Any]:
         return controller.library_json()
 
+    @app.get("/api/thumb/{kind}/{ident}", response_model=None)
+    async def thumb(kind: str, ident: str) -> FileResponse | JSONResponse:
+        path = controller.thumbnail(kind, ident) if kind in ("v", "g") else None
+        if path is None:
+            return JSONResponse({"code": "no_thumbnail"}, status_code=404)
+        # Its address changes with the picture (?v=…): it may be kept for long.
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=31536000"})
+
     @app.post("/api/play", status_code=204)
     async def play(body: PlayBody) -> None:
         await asyncio.to_thread(controller.play, body.videoId, body.start)

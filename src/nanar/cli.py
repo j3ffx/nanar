@@ -54,6 +54,8 @@ def open_folder(
     from nanar.pairing import load_key
     from nanar.player import MpvSession
     from nanar.progress import Progress
+    from nanar.thumbnails import Thumbnails
+    from nanar.watcher import FolderWatcher
 
     settings_path = data_dir(demo=demo) / "settings.json"
     settings = Settings.load(settings_path)
@@ -88,6 +90,12 @@ def open_folder(
     controller = Controller(
         library, settings, settings_path, MpvSession, progress=progress, demo=demo
     )
+    thumbnails = Thumbnails(data_dir(demo=demo) / "thumbnails", on_ready=controller.library_changed)
+    controller.thumbnails = thumbnails
+    thumbnails.schedule(library)
+    watcher = None if demo else FolderWatcher(Path(library.root), controller.set_library)
+    if watcher is not None:
+        watcher.start()
     app = create_app(controller, key=key, network=network)
     server = uvicorn.Server(
         uvicorn.Config(
@@ -99,6 +107,9 @@ def open_folder(
             server.run()
         finally:
             controller.shutdown()
+            thumbnails.stop()
+            if watcher is not None:
+                watcher.stop()
             announcer.stop()
         return
 
@@ -113,6 +124,9 @@ def open_folder(
         window.run()  # until the window is closed
     finally:
         controller.shutdown()
+        thumbnails.stop()
+        if watcher is not None:
+            watcher.stop()
         announcer.stop()
         server.should_exit = True
         thread.join(timeout=5)
