@@ -7,9 +7,9 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> **En construction.** Nanar sait déjà ranger ta bibliothèque, l’afficher sur la télé, lire tes
-> vidéos et se piloter depuis ton téléphone. Parcourir la bibliothèque depuis le téléphone arrive
-> dans la prochaine étape. Ce que chaque version apporte : le
+> **En construction.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
+> lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes. Reste à en faire une
+> version qui s’installe d’un clic sous Windows. Ce que chaque version apporte : le
 > [journal des changements](CHANGELOG.md).
 
 ## Ce que fait Nanar
@@ -18,13 +18,20 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
   téléchargements (`Film.2023.MULTi.VFF.1080p.WEB.H264-XYZ.mkv`), pour retrouver le titre et
   l’année. Les films d’un même dossier forment une saga, dans l’ordre des années ; les épisodes
   d’une série se suivent par saison, d’un dossier à l’autre.
+- **Des images, pas des noms de fichiers.** Chaque film a son image : l’affiche que tu as posée
+  à côté (`Film.jpg`, ou `poster.jpg` dans son dossier), sinon une image tirée du film lui-même.
+- **Reprendre là où tu t’étais arrêté.** Nanar retient où tu en es dans chaque vidéo, coche celles
+  que tu as vues, et enchaîne l’épisode suivant après un compte à rebours de dix secondes (`N`
+  pour lancer tout de suite, `S` pour arrêter).
+- **Toujours à jour.** Un film qui finit de se télécharger dans le dossier apparaît tout seul.
 - **Une fenêtre, comme un lecteur vidéo.** L’accueil s’anime pendant que tu choisis ; le film
   s’ouvre à la même place, à la même taille, et Nanar revient quand il s’arrête. En fenêtre ou en
   plein écran, à toi de voir : `F`, comme dans VLC.
 - **La télécommande dans ta poche.** Scanne le QR code affiché sur la télé : ton téléphone
-  (Android ou iPhone, rien à installer) devient la télécommande. Lecture, pause, ±10 s, ±1 min,
-  épisode suivant, volume, pistes audio et sous-titres (avec leur décalage et leur taille), plein
-  écran. La télé affiche ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
+  (Android ou iPhone, rien à installer) devient la télécommande. Parcours la bibliothèque, choisis
+  un film (la télé suit ce que tu regardes, pour que tout le monde voie), puis lecture, pause,
+  ±10 s, ±1 min, épisode suivant, volume, pistes audio et sous-titres, plein écran. La télé affiche
+  ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
 - **Tout se lit.** Le moteur de [mpv](https://mpv.io/) : tous les formats courants, les pistes
   audio et les sous-titres, le HDR. Nanar choisit la VF, sinon la VO avec les sous-titres français.
 - **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques, pas même une jaquette

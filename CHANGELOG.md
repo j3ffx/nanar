@@ -23,3 +23,11 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
   et son icône restent les mêmes d’un Wi-Fi à l’autre.
 - Les fenêtres de Nanar et de la lecture ont l’icône de Nanar, et leur bouton à elles dans la
   barre des tâches.
+- La bibliothèque sur le téléphone : les sagas, les séries et les films, avec leurs images ; un
+  film se lance d’un geste, et la télé suit ce que tu regardes sur le téléphone.
+- Chaque vidéo a une image : ton affiche si tu en as posé une à côté, sinon une image du film.
+- Nanar retient où tu en es : « Reprendre à 42:10 » ou « Depuis le début », et les vidéos vues
+  sont cochées.
+- À la fin d’un épisode, le suivant démarre après dix secondes, dans la même fenêtre.
+- Un film qui finit de se télécharger dans ton dossier apparaît tout seul.
+- Ouvrir Nanar une deuxième fois dit qu’il est déjà ouvert.
