@@ -83,6 +83,12 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   is the point. `--new-key` unpairs every phone, `--local` listens on loopback only. A paired
   phone's manifest start URL carries the key, so that an iPhone home screen icon (cookies of its
   own) is paired too.
+- **One name on every network:** `discovery.py` announces `nanar.local` (mDNS) with the
+  addresses of the real adapters (`pairing.lan_addresses` leaves out WSL, Hyper-V, VPN tunnels,
+  Bluetooth). The QR code holds the IP address, which always works; the page then moves to
+  `nanar.local` when the phone reaches it, so that the cookie and the home screen icon belong to a
+  name that outlives a change of Wi-Fi. `GET /api/health` is the one CORS-readable route, for that
+  probe.
 - **The phone's actions show on the TV** (mpv's OSD, `osd=True`); mpv's own keys already do.
 - **User data lives outside the repository**, in the OS data directory (`platformdirs`), overridable
   with `NANAR_DATA_DIR`. The demo keeps its own (`demo/` inside it).
@@ -98,13 +104,14 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - `src/nanar/`: Python package. `library.py` (reading release names with guessit, sagas and
   series), `player.py` (one mpv window per video, VLC-like keys), `controller.py` (the single place
   where state changes), `app.py` (API, WebSocket, pages, manifest), `security.py` and
-  `pairing.py` (who may drive Nanar), `desktop/` (the pywebview window, Win32
+  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `desktop/` (the pywebview window, Win32
   calls placing windows), `demo.py` (made-up library played from mpv's `lavfi` sources), `cli.py`.
   `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
   real libmpv without video or sound).
 - `web/`: the pages (Vite, React, CSS Modules, wouter). `/tv` is the TV page (`src/tv/`, arrow-key
   navigation in `src/lib/spatial.ts`), `/` the phone's page (`src/remote/`: pairing, then the remote). `public/` holds the
-  icons; `scripts/make-icons.py` draws the PNG ones. `npm run build` writes
+  icons; `scripts/make-icons.py` draws the PNG ones and `src/nanar/assets/nanar.ico`
+  (the windows' icon; the process has its own taskbar identity, `win32.declare_app_id`). `npm run build` writes
   them into `src/nanar/web/static/` (ignored), which the Python package serves and ships.
 - `scripts/`: repository checks, git hook helpers, `get-libmpv.py` (pinned libmpv build for Windows).
 

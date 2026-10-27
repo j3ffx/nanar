@@ -52,6 +52,12 @@ mires générées à la volée.
 2. Scanne-le avec l’appareil photo du téléphone, branché au même Wi-Fi que le PC. La page de la
    télécommande s’ouvre ; ajoute-la à l’écran d’accueil pour la retrouver d’un geste.
 
+Nanar s’annonce sur le réseau sous le nom **`nanar.local`** : quand ton téléphone sait trouver ce
+nom (les iPhone toujours, Android selon sa version), la télécommande s’ouvre à l’adresse
+`http://nanar.local:8642`, qui ne change pas d’un Wi-Fi à l’autre. L’icône de l’écran d’accueil
+marche alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau où tu l’as ajoutée, et
+il faut rescanner le QR code sur un autre Wi-Fi.
+
 Au premier lancement, Windows demande s’il faut laisser Nanar communiquer sur le réseau : accepte
 pour les **réseaux privés**. Sans cette autorisation, le téléphone ne trouve pas le PC.
 
@@ -98,7 +104,8 @@ Les règles du dépôt (commandes, commits, confidentialité, invariants) : [CLA
   [python-mpv](https://github.com/jaseg/python-mpv).
 - Noms des fichiers : [guessit](https://github.com/guessit-io/guessit) (LGPL 3).
 - Fenêtre : [pywebview](https://pywebview.flowrl.com/) (BSD).
-- QR code : [segno](https://github.com/heuer/segno) (BSD).
+- QR code : [segno](https://github.com/heuer/segno) (BSD) ; `nanar.local` :
+  [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf) (LGPL 2.1 ou plus).
 - Police [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (SIL Open Font License).
 
 ## Licence

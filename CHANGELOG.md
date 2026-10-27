@@ -19,3 +19,7 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
   volume, pistes audio et sous-titres, décalage et taille des sous-titres, plein écran. La télé
   affiche chaque action, et combien de téléphones sont connectés.
 - `nanar --new-key` change le QR code, `nanar --local` coupe la télécommande.
+- Nanar s’annonce sous le nom `nanar.local` : sur les téléphones qui le trouvent, la télécommande
+  et son icône restent les mêmes d’un Wi-Fi à l’autre.
+- Les fenêtres de Nanar et de la lecture ont l’icône de Nanar, et leur bouton à elles dans la
+  barre des tâches.
