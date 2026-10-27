@@ -222,3 +222,17 @@ def test_the_home_screen_icon_of_a_paired_phone_is_paired_too(phone: TestClient)
     manifest = phone.get("/manifest.webmanifest").json()
     assert manifest["start_url"] == f"/#k={KEY}"
     assert manifest["display"] == "standalone"
+
+
+def test_the_tv_follows_what_a_phone_looks_at(client: TestClient, phone: TestClient) -> None:
+    pair(phone)
+    before = client.get("/api/state").json()["view"]["seq"]
+    assert phone.post("/api/view", json={"path": "/g/abc", "focus": "v1"}).status_code == 204
+    view = client.get("/api/state").json()["view"]
+    assert view == {"path": "/g/abc", "focus": "v1", "seq": before + 1}
+    assert phone.post("/api/view", json={"path": "http://evil"}).status_code == 409
+
+
+def test_serves_the_pictures_it_has(client: TestClient) -> None:
+    assert client.get("/api/thumb/v/nope").status_code == 404
+    assert client.get("/api/thumb/x/nope").status_code == 404

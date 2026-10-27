@@ -49,9 +49,64 @@
     inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
 
+/* A picture (a frame of the film, most often 16:9) fills the card; its bottom darkens, for the
+   title to read on any image. */
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poster[data-image] .face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 35%, rgb(10 6 16 / 0.92) 88%);
+}
+
+.title,
+.detail {
+  position: relative;
+  z-index: 1;
+}
+
+.watched {
+  position: absolute;
+  top: 26px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 800;
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 5px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
 /* A strip of film perforations along the top, for the look. */
 .face::before {
   content: '';
+  z-index: 2;
   position: absolute;
   inset: 10px 10px auto;
   height: 8px;
@@ -83,17 +138,17 @@
 }
 
 .poster:hover,
-.poster:focus-visible {
+.poster:focus {
   transform: scale(1.07);
   filter: none;
   z-index: 1;
 }
 
-.poster:focus-visible {
+.poster:focus {
   outline: none;
 }
 
-.poster:focus-visible .face {
+.poster:focus .face {
   box-shadow:
     0 0 0 4px var(--focus),
     0 0 40px rgb(255 194 61 / 0.45),

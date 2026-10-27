@@ -1,7 +1,9 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'wouter';
 
 import { play, type Library } from '@/lib/api';
-import { countLabel, episodeCode, shortTitle } from '@/lib/format';
+import { countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
+import { ratioOf, resumeLabel } from '@/lib/progress';
 
 import styles from './Tv.module.css';
 
@@ -35,14 +37,44 @@ export function GroupPage({ library, groupId, onError }: Props) {
       <ol className={styles.list}>
         {group.videos.map((id, index) => {
           const video = library.videos[id]!;
+          const ratio = ratioOf(video);
+          const resume = resumeLabel(video);
           return (
             <li key={id}>
-              <button type="button" data-nav className={styles.row} onClick={() => void start(id)}>
+              <button
+                type="button"
+                data-nav
+                data-id={id}
+                className={styles.row}
+                onClick={() => void start(id)}
+              >
+                <span
+                  className={styles.rowThumb}
+                  style={{ '--hue': hueOf(id) } as CSSProperties}
+                  aria-hidden="true"
+                >
+                  {video.thumb && <img src={video.thumb} alt="" loading="lazy" />}
+                  {ratio > 0 && (
+                    <span className={styles.rowProgress}>
+                      <span style={{ width: `${ratio * 100}%` }} />
+                    </span>
+                  )}
+                </span>
                 <span className={styles.rowNumber}>
                   {video.kind === 'episode' ? episodeCode(video) : index + 1}
                 </span>
-                <span className={styles.rowTitle}>{shortTitle(video)}</span>
-                {video.year && <span className={styles.rowDetail}>{video.year}</span>}
+                <span className={styles.rowText}>
+                  <span className={styles.rowTitle}>{shortTitle(video)}</span>
+                  {resume && <span className={styles.rowResume}>{resume}</span>}
+                </span>
+                <span className={styles.rowDetail}>
+                  {video.progress?.watched && (
+                    <span className={styles.rowWatched} aria-label="Vu">
+                      ✓
+                    </span>
+                  )}
+                  {video.year}
+                </span>
               </button>
             </li>
           );

@@ -2,6 +2,7 @@ import { useLocation } from 'wouter';
 
 import { play, type Library } from '@/lib/api';
 import { countLabel } from '@/lib/format';
+import { groupWatched, ratioOf } from '@/lib/progress';
 
 import { Poster } from './Poster';
 import styles from './Tv.module.css';
@@ -44,6 +45,8 @@ export function Home({ library, onError }: Props) {
                   id={id}
                   title={group.title}
                   detail={countLabel(group)}
+                  image={group.thumb}
+                  watched={groupWatched(library, group)}
                   stacked
                   onActivate={() => navigate(`/g/${id}`)}
                 />
@@ -66,6 +69,9 @@ export function Home({ library, onError }: Props) {
                   id={id}
                   title={video.title}
                   detail={video.year ?? ''}
+                  image={video.thumb}
+                  progress={ratioOf(video)}
+                  watched={video.progress?.watched}
                   onActivate={() => void start(id)}
                 />
               );

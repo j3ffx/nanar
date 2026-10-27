@@ -14,6 +14,17 @@ import { useIdle } from './useIdle';
 
 const DIM_AFTER_MS = 4 * 60 * 1000;
 
+function findItem(root: HTMLElement | null, id: string | null): HTMLElement | null {
+  return id ? (root?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`) ?? null) : null;
+}
+
+/** Focuses an item (or the first one), in the middle of the screen. */
+function putForward(root: HTMLElement | null, id: string | null): void {
+  const target = findItem(root, id) ?? root?.querySelector<HTMLElement>('[data-nav]');
+  target?.focus();
+  target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 /** The TV page, shown in Nanar's window: the library, browsed with the arrows or the mouse. */
 export function Tv() {
   const { state } = useLive();
@@ -47,6 +58,26 @@ export function Tv() {
     return () => window.removeEventListener('keydown', onKey);
   }, [location, navigate, state?.fullscreen]);
 
+  // The TV follows what a phone looks at: its page, and the film it picked. Not on first load
+  // (the TV opens on its own home), only when a phone moves.
+  const followed = useRef<number | null>(null);
+  const pending = useRef<string | null>(null); // the item to put forward once its page shows
+  const view = state?.view;
+  useEffect(() => {
+    if (!view) return;
+    if (followed.current === null || view.seq === followed.current) {
+      followed.current = view.seq;
+      return;
+    }
+    followed.current = view.seq;
+    if (view.path !== location) {
+      pending.current = view.focus ?? '';
+      navigate(view.path);
+    } else {
+      putForward(main.current, view.focus);
+    }
+  }, [view, location, navigate]);
+
   // Back from a saga, its card has the focus again; otherwise the first card takes it, so that
   // the arrows work straight away.
   const lastGroup = useRef<string | null>(null);
@@ -54,11 +85,13 @@ export function Tv() {
     if (!library || !main.current) return;
     const opened = /^\/g\/([^/]+)/.exec(location)?.[1];
     if (opened) lastGroup.current = opened;
+    if (pending.current !== null) {
+      putForward(main.current, pending.current);
+      pending.current = null;
+      return;
+    }
     if (main.current.contains(document.activeElement)) return;
-    const back =
-      location === '/' && lastGroup.current
-        ? main.current.querySelector<HTMLElement>(`[data-id="${lastGroup.current}"]`)
-        : null;
+    const back = location === '/' ? findItem(main.current, lastGroup.current) : null;
     (back ?? main.current.querySelector<HTMLElement>('[data-nav]'))?.focus();
   }, [library, location]);
 

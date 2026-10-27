@@ -22,16 +22,27 @@ const MESSAGES: Record<string, string> = {
   bad_value: 'Nanar n’a pas compris.',
 };
 
+export type Tab = 'remote' | 'library';
+
 interface Props {
   state: State | null;
   connected: boolean;
   hop: Hop;
+  tab: Tab;
+  onTab: (tab: Tab) => void;
   onUnpaired: () => void;
+  /** The library tab's content, given a way to show a message. */
+  library: (notify: (message: string) => void) => ReactNode;
 }
 
-export function Controls({ state, connected, hop, onUnpaired }: Props) {
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+export function Controls({ state, connected, hop, tab, onTab, onUnpaired, library }: Props) {
+  const [toast, setToast] = useState<{ text: string } | null>(null);
+  const notify = useCallback((text: string) => setToast({ text }), []);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const send = useCallback(
     (action: string, value?: unknown) => {
@@ -42,12 +53,10 @@ export function Controls({ state, connected, hop, onUnpaired }: Props) {
           return;
         }
         const code = error instanceof ApiError ? error.code : '';
-        setToast(MESSAGES[code] ?? 'Nanar ne répond pas.');
-        clearTimeout(toastTimer.current);
-        toastTimer.current = setTimeout(() => setToast(null), 3000);
+        notify(MESSAGES[code] ?? 'Nanar ne répond pas.');
       });
     },
-    [onUnpaired],
+    [onUnpaired, notify],
   );
 
   const playing = state?.playing ?? null;
@@ -72,14 +81,40 @@ export function Controls({ state, connected, hop, onUnpaired }: Props) {
         </button>
       </header>
 
-      {playing ? (
+      {state?.upNext && (
+        <aside className={styles.upNext} aria-live="polite">
+          <p className={styles.upNextText}>
+            <span>
+              À suivre dans <strong>{state.upNext.seconds} s</strong>
+            </span>
+            <span className={styles.upNextTitle}>
+              {state.upNext.video.kind === 'episode'
+                ? `${episodeCode(state.upNext.video)} ${state.upNext.video.episodeTitle ?? ''}`
+                : state.upNext.video.title}
+            </span>
+          </p>
+          <div className={styles.row}>
+            <Pill onClick={() => send('next')}>
+              <Icon.Next /> Maintenant
+            </Pill>
+            <Pill onClick={() => send('stop')} tone="stop">
+              <Icon.Stop /> Arrêter
+            </Pill>
+          </div>
+        </aside>
+      )}
+
+      {tab === 'library' ? (
+        library(notify)
+      ) : playing ? (
         <NowPlaying playing={playing} send={send} />
       ) : (
         <section className={styles.idle}>
           <p className={styles.lead}>{state ? 'Rien à l’écran.' : 'Connexion à Nanar…'}</p>
-          <p className={styles.hint}>
-            Choisis un film sur la télé. Bientôt, tu pourras aussi parcourir ta bibliothèque d’ici.
-          </p>
+          <p className={styles.hint}>Choisis un film dans la bibliothèque, ou sur la télé.</p>
+          <button type="button" className={styles.idleButton} onClick={() => onTab('library')}>
+            Ouvrir la bibliothèque
+          </button>
         </section>
       )}
 
@@ -98,9 +133,28 @@ export function Controls({ state, connected, hop, onUnpaired }: Props) {
 
       {toast && (
         <p className={styles.toast} role="status">
-          {toast}
+          {toast.text}
         </p>
       )}
+
+      <nav className={styles.tabs} aria-label="Pages">
+        <button
+          type="button"
+          className={styles.tab}
+          aria-current={tab === 'remote' ? 'page' : undefined}
+          onClick={() => onTab('remote')}
+        >
+          <Icon.Play /> Télécommande
+        </button>
+        <button
+          type="button"
+          className={styles.tab}
+          aria-current={tab === 'library' ? 'page' : undefined}
+          onClick={() => onTab('library')}
+        >
+          <Icon.Grid /> Bibliothèque
+        </button>
+      </nav>
     </main>
   );
 }

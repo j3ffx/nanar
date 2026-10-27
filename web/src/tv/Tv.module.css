@@ -111,7 +111,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 5.5em 1fr auto;
+  grid-template-columns: clamp(96px, 9vw, 150px) 5em 1fr auto;
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -129,12 +129,12 @@
 }
 
 .row:hover,
-.row:focus-visible {
+.row:focus {
   background: rgb(52 36 70 / 0.92);
   transform: translateX(8px);
 }
 
-.row:focus-visible {
+.row:focus {
   outline: 4px solid var(--focus);
   outline-offset: 0;
 }
@@ -145,8 +145,60 @@
   color: var(--accent);
 }
 
+.rowThumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(160deg, hsl(var(--hue) 55% 34%), hsl(calc(var(--hue) + 30) 60% 14%));
+}
+
+.rowThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rowProgress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.rowProgress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.rowText {
+  display: grid;
+  gap: 2px;
+}
+
 .rowTitle {
   font-weight: 600;
+}
+
+.rowResume {
+  font-size: 0.8em;
+  color: var(--accent);
+}
+
+.rowWatched {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 800;
+  font-size: 0.8em;
 }
 
 .rowDetail {

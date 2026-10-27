@@ -101,6 +101,7 @@ class Controller:
         self._up_next: Video | None = None
         self._up_next_seconds = 0
         self._countdown: threading.Timer | None = None
+        self._view: dict[str, Any] = {"path": "/", "focus": None, "seq": 0}
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -151,6 +152,7 @@ class Controller:
                 "libraryVersion": self._library_version,
                 "playing": playing,
                 "upNext": up_next,
+                "view": dict(self._view),
             }
 
     def library_json(self) -> dict[str, Any]:
@@ -189,6 +191,15 @@ class Controller:
             return None
         # The file's age in the URL: a new picture is a new address, and caches stay right.
         return f"/api/thumb/{kind}/{ident}?v={int(path.stat().st_mtime)}"
+
+    def set_view(self, path: str, focus: str | None) -> None:
+        """What a phone is looking at in the library: the TV page follows it, so that the
+        whole room sees the choice being made."""
+        if not path.startswith("/") or len(path) > 200:
+            raise CommandError("bad_value")
+        with self._lock:
+            self._view = {"path": path, "focus": focus, "seq": self._view["seq"] + 1}
+        self._announce()
 
     def set_phones(self, count: int) -> None:
         """How many phones are connected (the TV page shows it)."""

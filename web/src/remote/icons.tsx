@@ -124,3 +124,12 @@ export const Check = () => (
     <path d="M5 12.5l4.5 4.5L19 7.5" />
   </Icon>
 );
+
+export const Grid = () => (
+  <Icon>
+    <rect x="4" y="4" width="7" height="9" rx="1.5" />
+    <rect x="13" y="4" width="7" height="9" rx="1.5" />
+    <rect x="4" y="15" width="7" height="5" rx="1.5" />
+    <rect x="13" y="15" width="7" height="5" rx="1.5" />
+  </Icon>
+);

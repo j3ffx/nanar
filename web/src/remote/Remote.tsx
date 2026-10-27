@@ -1,6 +1,9 @@
-import { useLive } from '@/lib/api';
+import { useLocation } from 'wouter';
 
-import { Controls } from './Controls';
+import { useLibrary, useLive } from '@/lib/api';
+
+import { Controls, type Tab } from './Controls';
+import { Library } from './Library';
 import styles from './Remote.module.css';
 import { usePairing, type Hop } from './usePairing';
 
@@ -42,5 +45,20 @@ export function Remote() {
 
 function Paired({ hop, onUnpaired }: { hop: Hop; onUnpaired: () => void }) {
   const { state, connected } = useLive();
-  return <Controls state={state} connected={connected} hop={hop} onUnpaired={onUnpaired} />;
+  const library = useLibrary(state?.libraryVersion);
+  const [location, navigate] = useLocation();
+  const tab: Tab = location.startsWith('/bibliotheque') ? 'library' : 'remote';
+  return (
+    <Controls
+      state={state}
+      connected={connected}
+      hop={hop}
+      tab={tab}
+      onTab={(next) => navigate(next === 'library' ? '/bibliotheque' : '/')}
+      onUnpaired={onUnpaired}
+      library={(notify) => (
+        <Library library={library} onStarted={() => navigate('/')} onError={notify} />
+      )}
+    />
+  );
 }

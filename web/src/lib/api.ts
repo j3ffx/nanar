@@ -11,8 +11,9 @@ export interface Video {
   episode: number | null;
   episodeTitle: string | null;
   group: string | null;
-  /** Where it was left (absent from the live state, given with the library). */
+  /** Where it was left, and its picture (given with the library, not in the live state). */
   progress?: Progress | null;
+  thumb?: string | null;
 }
 
 export interface Progress {
@@ -31,6 +32,7 @@ export interface Group {
   kind: 'saga' | 'series';
   title: string;
   videos: string[];
+  thumb?: string | null;
 }
 
 export interface Library {
@@ -72,6 +74,8 @@ export interface State {
   libraryVersion: number;
   playing: Playing | null;
   upNext: UpNext | null;
+  /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
+  view: { path: string; focus: string | null; seq: number };
 }
 
 export interface Pairing {
@@ -108,6 +112,10 @@ export const command = (action: string, value?: unknown) =>
   send('/api/command', { action, value: value ?? null });
 
 export const pair = (key: string) => send('/api/pair', { key });
+
+/** Tells the TV what this phone looks at: the TV page's path ("/", "/g/<id>") and an item. */
+export const setView = (path: string, focus: string | null = null) =>
+  send('/api/view', { path, focus });
 
 /** Whether this browser may drive Nanar (a paired phone, or this machine). */
 export async function isPaired(): Promise<boolean> {

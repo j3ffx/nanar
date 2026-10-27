@@ -34,6 +34,11 @@ class CommandBody(BaseModel):
     value: Any = None
 
 
+class ViewBody(BaseModel):
+    path: str  # the TV page's path: "/" or "/g/<group>"
+    focus: str | None = None  # the video or group to put forward
+
+
 class PairBody(BaseModel):
     key: str
 
@@ -94,6 +99,10 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
         await asyncio.to_thread(
             controller.command, body.action, body.value, osd=not _caller(request).local
         )
+
+    @app.post("/api/view", status_code=204)
+    async def view(body: ViewBody) -> None:
+        controller.set_view(body.path, body.focus)
 
     @app.post("/api/pair", response_model=None)
     async def pair(body: PairBody) -> Response:
