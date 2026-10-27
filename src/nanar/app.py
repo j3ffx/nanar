@@ -26,7 +26,7 @@ TEN_YEARS = 10 * 365 * 24 * 3600
 
 class PlayBody(BaseModel):
     videoId: str  # the pages' camelCase
-    start: float = 0.0
+    start: float | None = None  # None: where it was left
 
 
 class CommandBody(BaseModel):
@@ -75,7 +75,7 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
 
     @app.get("/api/library")
     async def library() -> dict[str, Any]:
-        return controller.library.to_json()
+        return controller.library_json()
 
     @app.post("/api/play", status_code=204)
     async def play(body: PlayBody) -> None:

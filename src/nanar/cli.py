@@ -53,6 +53,7 @@ def open_folder(
     from nanar.library import scan
     from nanar.pairing import load_key
     from nanar.player import MpvSession
+    from nanar.progress import Progress
 
     settings_path = data_dir(demo=demo) / "settings.json"
     settings = Settings.load(settings_path)
@@ -83,7 +84,10 @@ def open_folder(
         addresses = ", ".join(f"http://{a}:{port}" for a in network.addresses())
         print(f"Télécommande : scanne le QR code sur la télé ({addresses or 'aucun réseau'})")
 
-    controller = Controller(library, settings, settings_path, MpvSession, demo=demo)
+    progress = Progress(data_dir(demo=demo) / "progress.db")
+    controller = Controller(
+        library, settings, settings_path, MpvSession, progress=progress, demo=demo
+    )
     app = create_app(controller, key=key, network=network)
     server = uvicorn.Server(
         uvicorn.Config(

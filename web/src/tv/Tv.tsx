@@ -16,8 +16,8 @@ const DIM_AFTER_MS = 4 * 60 * 1000;
 
 /** The TV page, shown in Nanar's window: the library, browsed with the arrows or the mouse. */
 export function Tv() {
-  const library = useLibrary();
   const { state } = useLive();
+  const library = useLibrary(state?.libraryVersion);
   const [location, navigate] = useLocation();
   const main = useRef<HTMLElement>(null);
   const idle = useIdle(DIM_AFTER_MS);

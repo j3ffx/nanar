@@ -14,6 +14,8 @@ class FakeSession:
         self.callbacks = callbacks
         self.commands: list[tuple[str, Any]] = []
         self.osd: list[bool] = []
+        self.loaded: list[Start] = []
+        self.messages: list[str] = []
         self.closed = False
         self.window = Rect(10, 20, 800, 450)
 
@@ -22,6 +24,13 @@ class FakeSession:
             raise ValueError("volume")
         self.commands.append((action, value))
         self.osd.append(osd)
+
+    def load(self, start: Start) -> None:
+        self.loaded.append(start)
+        self.start = start
+
+    def message(self, text: str, seconds: float) -> None:
+        self.messages.append(text)
 
     def rect(self) -> Rect | None:
         return self.window
@@ -35,7 +44,12 @@ class FakeSession:
         self.callbacks.changed(Playback(**changes))
 
     def finish(self) -> None:
-        self.callbacks.ended(True, self.window)
+        """The video reached its end (mpv stays open on its last picture)."""
+        self.callbacks.finished()
+
+    def fail(self) -> None:
+        """The video could not play, or mpv's window was closed."""
+        self.callbacks.ended(False, self.window)
 
 
 class FakeSessions:

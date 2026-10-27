@@ -11,6 +11,19 @@ export interface Video {
   episode: number | null;
   episodeTitle: string | null;
   group: string | null;
+  /** Where it was left (absent from the live state, given with the library). */
+  progress?: Progress | null;
+}
+
+export interface Progress {
+  position: number;
+  duration: number | null;
+  watched: boolean;
+}
+
+export interface UpNext {
+  video: Video;
+  seconds: number;
 }
 
 export interface Group {
@@ -56,7 +69,9 @@ export interface State {
   demo: boolean;
   fullscreen: boolean;
   phones: number;
+  libraryVersion: number;
   playing: Playing | null;
+  upNext: UpNext | null;
 }
 
 export interface Pairing {
@@ -85,7 +100,9 @@ async function send(path: string, body: unknown): Promise<void> {
   }
 }
 
-export const play = (videoId: string, start = 0) => send('/api/play', { videoId, start });
+/** Plays a video: from `start` (0: from the beginning), or where it was left when omitted. */
+export const play = (videoId: string, start?: number) =>
+  send('/api/play', { videoId, start: start ?? null });
 
 export const command = (action: string, value?: unknown) =>
   send('/api/command', { action, value: value ?? null });
@@ -112,20 +129,27 @@ export async function fetchLibrary(): Promise<Library> {
   return (await response.json()) as Library;
 }
 
-/** The library, loaded once. */
-export function useLibrary(): Library | null {
+/**
+ * The library, loaded again whenever `version` changes (the state's `libraryVersion`: new files,
+ * thumbnails, what was watched). The previous one stays shown while the new one loads.
+ */
+export function useLibrary(version?: number): Library | null {
   const [library, setLibrary] = useState<Library | null>(null);
   useEffect(() => {
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const load = () =>
       fetchLibrary()
         .then((lib) => alive && setLibrary(lib))
-        .catch(() => alive && setTimeout(load, 2000));
+        .catch(() => {
+          if (alive) retry = setTimeout(load, 2000);
+        });
     load();
     return () => {
       alive = false;
+      clearTimeout(retry);
     };
-  }, []);
+  }, [version]);
   return library;
 }
 

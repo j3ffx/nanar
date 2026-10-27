@@ -27,7 +27,7 @@ class Recorder:
     def __init__(self) -> None:
         self.latest = Playback()
         self.actions: list[str] = []
-        self.finished: bool | None = None
+        self.at_end = threading.Event()
         self.done = threading.Event()
         self.changed_event = threading.Event()
 
@@ -38,8 +38,10 @@ class Recorder:
     def action(self, name: str) -> None:
         self.actions.append(name)
 
+    def finished(self) -> None:
+        self.at_end.set()
+
     def ended(self, finished: bool, rect: Rect | None) -> None:
-        self.finished = finished
         self.done.set()
 
     def wait(self, check: Any, timeout: float = 10) -> None:
@@ -79,11 +81,14 @@ def test_plays_and_obeys_commands() -> None:
     assert not recorder.done.is_set()  # closed by Nanar: no "ended" report
 
 
-def test_reports_the_end_of_the_video() -> None:
+def test_reports_the_end_and_plays_the_next_video_in_the_same_window() -> None:
     recorder = Recorder()
     session = MpvSession(Start(demo.source(1, 1), "Démo"), Settings(), recorder)
     try:
-        assert recorder.done.wait(15)
-        assert recorder.finished is True
+        assert recorder.at_end.wait(15)
+        assert not recorder.done.is_set()  # mpv stays open on the last picture
+        recorder.at_end.clear()
+        session.load(Start(demo.source(2, 1), "Suite"))
+        assert recorder.at_end.wait(15)
     finally:
         session.close()

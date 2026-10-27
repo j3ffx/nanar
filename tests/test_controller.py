@@ -5,10 +5,12 @@ from typing import Any
 
 import pytest
 
+from nanar import controller as controller_module
 from nanar.config import Settings
 from nanar.controller import CommandError, Controller
 from nanar.library import Library, build
 from nanar.player import Rect
+from nanar.progress import Progress
 
 from .fakes import FakeSessions, FakeWindow
 
@@ -17,6 +19,11 @@ PATHS = [
     "Saga/Saga 1990.mkv",
     "Saga/Saga 2 1992.mkv",
 ]
+
+
+@pytest.fixture(autouse=True)
+def quick_countdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 0.01)
 
 
 @pytest.fixture
@@ -35,10 +42,21 @@ def window() -> FakeWindow:
 
 
 @pytest.fixture
+def progress() -> Progress:
+    return Progress(None)
+
+
+@pytest.fixture
 def controller(
-    library: Library, sessions: FakeSessions, window: FakeWindow, tmp_path: Path
+    library: Library,
+    sessions: FakeSessions,
+    window: FakeWindow,
+    progress: Progress,
+    tmp_path: Path,
 ) -> Iterator[Controller]:
-    c = Controller(library, Settings(), tmp_path / "settings.json", sessions, window)
+    c = Controller(
+        library, Settings(), tmp_path / "settings.json", sessions, window, progress=progress
+    )
     yield c
     c.shutdown()
 
@@ -80,14 +98,107 @@ def test_stopping_brings_the_window_back_where_mpv_was(
     assert controller.state()["playing"] is None
 
 
-def test_the_end_of_the_video_brings_the_window_back(
+def test_a_failed_video_or_a_closed_window_brings_nanar_back(
     controller: Controller, library: Library, sessions: FakeSessions, window: FakeWindow
 ) -> None:
     controller.play(video_id(library, "Seul"))
-    sessions.last.finish()
+    sessions.last.fail()
     wait_for(lambda: window.visible)
     assert sessions.last.closed
     assert controller.state()["playing"] is None
+
+
+def test_the_end_of_a_lone_film_brings_nanar_back_and_marks_it_watched(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    window: FakeWindow,
+    progress: Progress,
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    sessions.last.report(position=5990.0, duration=6000.0)
+    sessions.last.finish()
+    wait_for(lambda: window.visible)
+    entry = progress.get("/films", "Seul 2001.mkv")
+    assert entry is not None
+    assert entry.watched
+    assert controller.library_json()["videos"][video_id(library, "Seul")]["progress"]["watched"]
+
+
+def test_the_end_of_an_episode_counts_down_then_plays_the_next_in_the_same_window(
+    controller: Controller, library: Library, sessions: FakeSessions, window: FakeWindow
+) -> None:
+    heard: list[dict[str, Any]] = []
+    controller.subscribe(heard.append)
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: sessions.last.loaded)
+    assert len(sessions.made) == 1  # no second window
+    assert sessions.last.loaded[0].title == "Saga 2"
+    assert sessions.last.loaded[0].start == 0.0
+    assert not window.visible
+    counts = [s["upNext"]["seconds"] for s in heard if s["upNext"]]
+    assert counts[0] == controller_module.UP_NEXT_SECONDS
+    assert counts == sorted(counts, reverse=True)
+    assert any(m.startswith("À suivre : Saga 2") for m in sessions.last.messages)
+    assert controller.state()["upNext"] is None
+
+
+def test_stop_during_the_countdown_goes_back_to_the_library(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    window: FakeWindow,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 5)  # a countdown that stays put
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: controller.state()["upNext"])
+    controller.command("stop")
+    assert window.visible
+    assert sessions.last.loaded == []
+
+
+def test_next_during_the_countdown_plays_at_once(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 5)
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: controller.state()["upNext"])
+    controller.command("next")
+    assert sessions.last.loaded[-1].title == "Saga 2"
+    assert controller.state()["upNext"] is None
+
+
+def test_resumes_where_a_video_was_left(
+    controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
+) -> None:
+    progress.save("/films", "Seul 2001.mkv", 600.0, 6000.0, finished=False)
+    controller.play(video_id(library, "Seul"))
+    assert sessions.last.start.start == 595.0  # a few seconds earlier, to find the thread
+    controller.command("stop")
+    controller.play(video_id(library, "Seul"), start=0.0)
+    assert sessions.last.start.start == 0.0  # "from the start" overrides
+
+
+def test_saves_where_a_video_is_while_it_plays_and_when_it_stops(
+    controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    sessions.last.report(position=30.0, duration=6000.0)
+    wait_for(lambda: progress.get("/films", "Seul 2001.mkv"))
+    sessions.last.report(position=42.0, duration=6000.0)
+    wait_for(lambda: controller.state()["playing"]["position"] == 42.0)
+    controller.command("stop")
+    entry = progress.get("/films", "Seul 2001.mkv")
+    assert entry is not None
+    assert entry.position == 42.0
+    assert not entry.watched
 
 
 def test_player_commands_go_to_mpv(
@@ -114,13 +225,13 @@ def test_commands_fail_clearly(controller: Controller, library: Library) -> None
         controller.command("next")
 
 
-def test_next_and_previous_move_inside_a_saga(
+def test_next_and_previous_move_inside_a_saga_in_the_same_window(
     controller: Controller, library: Library, sessions: FakeSessions
 ) -> None:
     controller.play(video_id(library, "Saga"))
     assert controller.state()["playing"]["hasNext"] is True
     controller.command("next")
-    assert sessions.made[0].closed
+    assert len(sessions.made) == 1
     assert sessions.last.start.title == "Saga 2"
     assert controller.state()["playing"]["hasNext"] is False
     controller.command("previous")
@@ -154,13 +265,14 @@ def test_fullscreen_toggled_in_mpv_is_followed(
     assert controller.state()["playing"]["position"] == 3.0
 
 
-def test_a_finished_session_is_ignored_once_another_plays(
+def test_a_closed_session_is_ignored_once_another_plays(
     controller: Controller, library: Library, sessions: FakeSessions, window: FakeWindow
 ) -> None:
     controller.play(video_id(library, "Seul"))
     first = sessions.last
+    controller.command("stop")
     controller.play(video_id(library, "Saga"))
-    first.finish()  # late news from the first mpv
+    first.fail()  # late news from the first mpv
     first.report(position=99.0)
     time.sleep(0.1)
     assert controller.state()["playing"]["video"]["title"] == "Saga"
@@ -186,3 +298,13 @@ def test_listeners_hear_every_change(controller: Controller, library: Library) -
     unsubscribe()
     controller.command("fullscreen")
     assert [bool(s["playing"]) for s in heard] == [True, False]
+
+
+def test_a_new_reading_of_the_folder_reaches_the_pages(
+    controller: Controller, library: Library
+) -> None:
+    before = controller.state()["libraryVersion"]
+    controller.set_library(build("/films", [*PATHS, "Nouveau 2024.mkv"]))
+    assert controller.state()["libraryVersion"] == before + 1
+    titles = {v["title"] for v in controller.library_json()["videos"].values()}
+    assert "Nouveau" in titles
