@@ -40,7 +40,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
-*.spec
 
 # Frontend build, bundled into the Python package at build time
 src/nanar/web/static/

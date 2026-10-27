@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a version tag (v0.1.0) publishes its GitHub release, with the notes of that version
-# from CHANGELOG.md and the built package. See CLAUDE.md → Releases.
+# Pushing a version tag (v0.1.0) publishes its GitHub release: the Windows zip and its SHA-256,
+# the Python package, and the notes of that version from CHANGELOG.md. See CLAUDE.md → Releases.
 on:
   push:
     tags: ['v*']
@@ -11,9 +11,12 @@ permissions:
 
 jobs:
   release:
-    name: GitHub release
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: GitHub release (Windows build)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
 
@@ -35,17 +38,42 @@ jobs:
             exit 1
           fi
 
-      - name: Build the package (pages included)
-        run: npm ci && npm run build && uv build
-
-      - name: Notes from CHANGELOG.md
+      - name: Notes from CHANGELOG.md (fails if the version has none)
         run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
+
+      - run: npm ci
+      - run: npm run build
+      - run: uv sync --locked
+      - run: uv run python scripts/get-libmpv.py
+
+      - name: Tests, with the real libmpv
+        run: uv run pytest -q
+
+      - name: Windows build (zip and SHA-256)
+        run: uv run python scripts/build-windows.py
+
+      - name: The build starts and answers
+        run: |
+          export NANAR_DATA_DIR="$RUNNER_TEMP/nanar-data"
+          ./dist/Nanar/Nanar.exe --demo --headless --local &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8642/api/health; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::Nanar.exe did not answer"
+          cat "$NANAR_DATA_DIR/nanar.log" || true
+          exit 1
+
+      - name: Python package
+        run: uv build
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "$GITHUB_REF_NAME" dist/*
+          gh release create "$GITHUB_REF_NAME"
+          dist/nanar-*-windows.zip dist/nanar-*-windows.zip.sha256
+          dist/nanar-*.whl dist/nanar-*.tar.gz
           --title "Nanar ${GITHUB_REF_NAME#v}"
           --notes-file release-notes.md
           --verify-tag
