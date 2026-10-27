@@ -29,5 +29,7 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 - Nanar retient où tu en es : « Reprendre à 42:10 » ou « Depuis le début », et les vidéos vues
   sont cochées.
 - À la fin d’un épisode, le suivant démarre après dix secondes, dans la même fenêtre.
+- Sur le téléphone, la barre de progression se fait glisser : l’heure visée s’affiche en grand, et
+  la vidéo y saute quand tu lâches.
 - Un film qui finit de se télécharger dans ton dossier apparaît tout seul.
 - Ouvrir Nanar une deuxième fois dit qu’il est déjà ouvert.

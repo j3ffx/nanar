@@ -140,17 +140,75 @@
   margin-top: 14px;
 }
 
-.bar {
+/* The progress bar is a slider: thin at rest, the thumb big enough for a thumb. */
+.scrub {
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none; /* dragging it must not scroll the page */
+}
+
+.scrub::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) var(--level),
+    rgb(255 255 255 / 0.14) var(--level)
+  );
+}
+
+.scrub::-moz-range-track {
   height: 6px;
   border-radius: 3px;
   background: rgb(255 255 255 / 0.14);
-  overflow: hidden;
 }
 
-.fill {
-  height: 100%;
+.scrub::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
   background: var(--accent);
-  transition: width 1s linear;
+}
+
+.scrub::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+  transition: transform 0.15s;
+}
+
+.scrub::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.progress[data-seeking] .scrub::-webkit-slider-thumb {
+  transform: scale(1.35);
+}
+
+.scrub:disabled {
+  opacity: 0.4;
+}
+
+/* While dragging: the time the video will jump to, big enough to read at arm's length. */
+.seekTo {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
 }
 
 .times {

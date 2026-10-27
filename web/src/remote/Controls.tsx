@@ -175,7 +175,7 @@ function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
           {video.kind === 'episode' ? (video.episodeTitle ?? video.title) : video.title}
         </h1>
         {video.kind === 'episode' && <p className={styles.series}>{video.title}</p>}
-        <Progress position={playing.position} duration={playing.duration} />
+        <Progress position={playing.position} duration={playing.duration} send={send} />
       </section>
 
       <section className={styles.pad} aria-label="Lecture">
@@ -251,24 +251,48 @@ function selectedLabel(tracks: Track[]): string | null {
   return tracks.find((t) => t.selected)?.label ?? null;
 }
 
-function Progress({ position, duration }: { position: number; duration: number | null }) {
-  const ratio = duration ? Math.min(1, position / duration) : 0;
+/**
+ * Where the video is, and where to go: the bar follows the finger (the time it would jump to
+ * shows big), and the video jumps there when the finger lifts.
+ */
+function Progress({
+  position,
+  duration,
+  send,
+}: {
+  position: number;
+  duration: number | null;
+  send: Send;
+}) {
+  const [target, setTarget] = useState<number | null>(null);
+  const shown = target ?? position;
+  const ratio = duration ? Math.min(1, shown / duration) : 0;
+  const commit = () => {
+    if (target !== null) send('seek_to', target);
+    setTarget(null);
+  };
   return (
-    <div className={styles.progress}>
-      <div
-        className={styles.bar}
-        role="progressbar"
+    <div className={styles.progress} data-seeking={target !== null || undefined}>
+      {target !== null && <p className={styles.seekTo}>{clock(target)}</p>}
+      <input
+        type="range"
+        className={styles.scrub}
+        min={0}
+        max={Math.max(1, Math.floor(duration ?? 0))}
+        step={1}
+        value={Math.floor(shown)}
+        disabled={!duration}
         aria-label="Avancement"
-        aria-valuemin={0}
-        aria-valuemax={Math.round(duration ?? 0)}
-        aria-valuenow={Math.round(position)}
-        aria-valuetext={`${clock(position)} sur ${duration ? clock(duration) : 'durée inconnue'}`}
-      >
-        <div className={styles.fill} style={{ width: `${ratio * 100}%` }} />
-      </div>
+        aria-valuetext={`${clock(shown)} sur ${duration ? clock(duration) : 'durée inconnue'}`}
+        style={{ '--level': `${ratio * 100}%` } as CSSProperties}
+        onChange={(event) => setTarget(Number(event.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={() => setTarget(null)}
+      />
       <div className={styles.times}>
-        <span>{clock(position)}</span>
-        <span>{duration ? `−${clock(duration - position)}` : ''}</span>
+        <span>{clock(shown)}</span>
+        <span>{duration ? `−${clock(duration - shown)}` : ''}</span>
       </div>
     </div>
   );
