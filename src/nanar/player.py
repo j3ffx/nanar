@@ -34,14 +34,45 @@ class Track:
     selected: bool
     external: bool = False
 
+    @property
+    def label(self) -> str:
+        """'Français (VFF)', 'Anglais', 'Piste 3'."""
+        language = LANGUAGES.get((self.lang or "").lower(), self.lang)
+        if language and self.title and self.title.casefold() != language.casefold():
+            return f"{language} ({self.title})"
+        return language or self.title or f"Piste {self.id}"
+
     def to_json(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "label": self.label,
             "lang": self.lang,
             "title": self.title,
             "selected": self.selected,
             "external": self.external,
         }
+
+
+# The languages films come in most, by their ISO 639 codes.
+LANGUAGES = {
+    code: name
+    for codes, name in [
+        (("fr", "fre", "fra", "fre-fr", "fr-fr"), "Français"),
+        (("fr-ca", "fre-ca"), "Français (Québec)"),
+        (("en", "eng"), "Anglais"),
+        (("es", "spa"), "Espagnol"),
+        (("de", "ger", "deu"), "Allemand"),
+        (("it", "ita"), "Italien"),
+        (("pt", "por"), "Portugais"),
+        (("nl", "dut", "nld"), "Néerlandais"),
+        (("ja", "jpn"), "Japonais"),
+        (("ko", "kor"), "Coréen"),
+        (("zh", "chi", "zho"), "Chinois"),
+        (("ru", "rus"), "Russe"),
+        (("ar", "ara"), "Arabe"),
+    ]
+    for code in codes
+}
 
 
 @dataclass
@@ -81,7 +112,8 @@ class Callbacks(Protocol):
 
 
 class Session(Protocol):
-    def command(self, action: str, value: Any = None) -> None: ...
+    def command(self, action: str, value: Any = None, *, osd: bool = False) -> None:
+        """Runs a player action; with `osd`, says on screen what changed."""
 
     def rect(self) -> Rect | None:
         """Where mpv's window is now (None when unknown)."""
@@ -197,31 +229,47 @@ class MpvSession:
         self._mpv.register_event_callback(self._on_event)
         self._mpv.play(start.source)
 
-    def command(self, action: str, value: Any = None) -> None:
+    def command(self, action: str, value: Any = None, *, osd: bool = False) -> None:
         m = self._mpv
+        message: str | None = None
         match action:
             case "pause":
                 m.pause = bool(value) if value is not None else not m.pause
-            case "seek":
-                m.command("seek", float(value), "relative")
-            case "seek_to":
-                m.command("seek", float(value), "absolute")
+                message = "Pause" if m.pause else "Lecture"
+            case "seek" | "seek_to":
+                m.command("seek", float(value), "relative" if action == "seek" else "absolute")
+                if osd:
+                    m.command("show-progress")
             case "volume":
                 m.volume = max(0.0, min(130.0, float(value)))
+                message = f"Volume : {round(m.volume)} %"
             case "mute":
                 m.mute = bool(value) if value is not None else not m.mute
+                message = "Son coupé" if m.mute else "Son rétabli"
             case "fullscreen":
                 m.fullscreen = bool(value) if value is not None else not m.fullscreen
             case "audio":
                 m.aid = int(value) if value is not None else "no"
+                message = f"Audio : {self._selected('audio') or 'aucun'}"
             case "sub":
                 m.sid = int(value) if value is not None else "no"
+                message = f"Sous-titres : {self._selected('sub') or 'aucun'}"
             case "sub_delay":
                 m.sub_delay = float(value)
+                message = f"Décalage des sous-titres : {m.sub_delay:+.1f} s".replace(".", ",")
             case "sub_scale":
                 m.sub_scale = max(0.3, min(3.0, float(value)))
+                message = f"Taille des sous-titres : {round(m.sub_scale * 100)} %"
             case _:
                 raise ValueError(f"unknown player action {action!r}")
+        if osd and message:
+            m.command("show-text", message, 2000)
+
+    def _selected(self, kind: str) -> str | None:
+        for raw in self._mpv.track_list or []:
+            if raw.get("type") == kind and raw.get("selected"):
+                return _track(raw).label
+        return None
 
     def rect(self) -> Rect | None:
         if sys.platform != "win32":

@@ -29,6 +29,12 @@ def open_folder(
     headless: Annotated[
         bool, typer.Option(help="Sans fenêtre Nanar : mpv seul, piloté par l'API.")
     ] = False,
+    local: Annotated[
+        bool, typer.Option(help="Sans télécommande : rien n'écoute sur le réseau.")
+    ] = False,
+    new_key: Annotated[
+        bool, typer.Option(help="Change le QR code : les téléphones déjà appairés ne le sont plus.")
+    ] = False,
     dev: Annotated[
         bool, typer.Option(help="La page vient du serveur Vite (npm run dev).", hidden=True)
     ] = False,
@@ -40,9 +46,10 @@ def open_folder(
         return
 
     from nanar import demo as demo_library
-    from nanar.app import create_app
+    from nanar.app import Network, create_app
     from nanar.controller import Controller
     from nanar.library import scan
+    from nanar.pairing import load_key
     from nanar.player import MpvSession
 
     settings_path = data_dir(demo=demo) / "settings.json"
@@ -61,9 +68,19 @@ def open_folder(
         library = scan(chosen)
     print(f"Nanar {__version__} : {len(library.videos)} vidéo(s) dans {library.root}")
 
+    # One key for the demo and the real library: a phone paired once stays paired.
+    key = load_key(data_dir(), renew=new_key)
+    network = Network(port=port, lan=not local)
+    if network.lan:
+        addresses = ", ".join(f"http://{a}:{port}" for a in network.addresses())
+        print(f"Télécommande : scanne le QR code sur la télé ({addresses or 'aucun réseau'})")
+
     controller = Controller(library, settings, settings_path, MpvSession, demo=demo)
+    app = create_app(controller, key=key, network=network)
     server = uvicorn.Server(
-        uvicorn.Config(create_app(controller), host="127.0.0.1", port=port, log_level="warning")
+        uvicorn.Config(
+            app, host="127.0.0.1" if local else "0.0.0.0", port=port, log_level="warning"
+        )
     )
     if headless:
         try:

@@ -13,13 +13,15 @@ class FakeSession:
         self.start = start
         self.callbacks = callbacks
         self.commands: list[tuple[str, Any]] = []
+        self.osd: list[bool] = []
         self.closed = False
         self.window = Rect(10, 20, 800, 450)
 
-    def command(self, action: str, value: Any = None) -> None:
+    def command(self, action: str, value: Any = None, *, osd: bool = False) -> None:
         if action == "volume" and not isinstance(value, int | float):
             raise ValueError("volume")
         self.commands.append((action, value))
+        self.osd.append(osd)
 
     def rect(self) -> Rect | None:
         return self.window

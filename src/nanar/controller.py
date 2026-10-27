@@ -84,6 +84,7 @@ class Controller:
         self._video: Video | None = None
         self._playback: Playback | None = None
         self._generation = 0  # tells a finished session's late callbacks from the current one's
+        self._phones = 0
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -127,8 +128,17 @@ class Controller:
                 "folder": self.library.root,
                 "demo": self._demo,
                 "fullscreen": self.settings.fullscreen,
+                "phones": self._phones,
                 "playing": playing,
             }
+
+    def set_phones(self, count: int) -> None:
+        """How many phones are connected (the TV page shows it)."""
+        with self._lock:
+            if count == self._phones:
+                return
+            self._phones = count
+        self._announce()
 
     # Actions -----------------------------------------------------------------------------------
 
@@ -157,7 +167,9 @@ class Controller:
             self.window.hide()
         self._announce()
 
-    def command(self, action: str, value: Any = None) -> None:
+    def command(self, action: str, value: Any = None, *, osd: bool = False) -> None:
+        """Runs an action. `osd`: say on screen what happened (the phone's actions, as nobody
+        sees the phone from the sofa); mpv already does for its own keys."""
         if action == "stop":
             self.stop()
         elif action in ("next", "previous"):
@@ -169,7 +181,7 @@ class Controller:
                 if self._session is None:
                     raise CommandError("nothing_playing")
                 try:
-                    self._session.command(action, value)
+                    self._session.command(action, value, osd=osd)
                 except (TypeError, ValueError) as error:
                     raise CommandError("bad_value") from error
         else:
