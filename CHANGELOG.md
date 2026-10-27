@@ -4,7 +4,11 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
-## À venir
+## 0.1.0 — 2026-10-27
+
+La première version : Nanar range tes films et tes séries, les affiche sur la télé et sur ton
+téléphone, les lit toutes, reprend où tu t’étais arrêté et enchaîne les épisodes. Pour Windows,
+un zip à décompresser (voir le README).
 
 - Nanar s’ouvre sur ton dossier de films (`nanar D:\Films`, ou le dernier ouvert) et range la
   bibliothèque d’après les noms des fichiers : titre et année, sagas dans l’ordre, séries par
@@ -32,4 +36,7 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 - Sur le téléphone, la barre de progression se fait glisser : l’heure visée s’affiche en grand, et
   la vidéo y saute quand tu lâches.
 - Un film qui finit de se télécharger dans ton dossier apparaît tout seul.
-- Ouvrir Nanar une deuxième fois dit qu’il est déjà ouvert.
+- Lancé sans dossier, Nanar te demande de le choisir sur la télé ; « Changer de dossier » en bas
+  de l’accueil.
+- Un clic droit sur un dossier → « Ouvrir avec Nanar » (si tu as accepté de l’ajouter) l’ouvre,
+  même quand Nanar est déjà ouvert.
