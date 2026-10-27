@@ -48,6 +48,7 @@ def open_folder(
     from nanar import demo as demo_library
     from nanar.app import Network, create_app
     from nanar.controller import Controller
+    from nanar.discovery import HOST, Announcer
     from nanar.library import scan
     from nanar.pairing import load_key
     from nanar.player import MpvSession
@@ -71,7 +72,10 @@ def open_folder(
     # One key for the demo and the real library: a phone paired once stays paired.
     key = load_key(data_dir(), renew=new_key)
     network = Network(port=port, lan=not local)
+    announcer = Announcer(port, network.addresses)
     if network.lan:
+        announcer.start()
+        network.name = lambda: HOST if announcer.active else None
         addresses = ", ".join(f"http://{a}:{port}" for a in network.addresses())
         print(f"Télécommande : scanne le QR code sur la télé ({addresses or 'aucun réseau'})")
 
@@ -87,6 +91,7 @@ def open_folder(
             server.run()
         finally:
             controller.shutdown()
+            announcer.stop()
         return
 
     from nanar.desktop.window import TvWindow
@@ -100,6 +105,7 @@ def open_folder(
         window.run()  # until the window is closed
     finally:
         controller.shutdown()
+        announcer.stop()
         server.should_exit = True
         thread.join(timeout=5)
 

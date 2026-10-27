@@ -45,6 +45,8 @@ class Network:
     port: int
     lan: bool = True
     addresses: Callable[[], list[str]] = field(default=lan_addresses)
+    # "nanar.local" while it is announced on the network (discovery.py), else None.
+    name: Callable[[], str | None] = field(default=lambda: None)
 
 
 def static_dir() -> Path:
@@ -61,7 +63,10 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
         return JSONResponse({"code": error.code}, status_code=409)
 
     @app.get("/api/health")
-    async def health() -> dict[str, str]:
+    async def health(response: Response) -> dict[str, str]:
+        # Readable from any page: the remote, opened by its IP address, asks whether
+        # nanar.local answers before moving there. It says nothing but the version.
+        response.headers["Access-Control-Allow-Origin"] = "*"
         return {"version": __version__}
 
     @app.get("/api/state")
@@ -96,8 +101,10 @@ def create_app(controller: Controller, *, key: str, network: Network) -> FastAPI
     async def pairing() -> dict[str, Any]:
         """For the TV page: the addresses to show, and the URL its QR code holds."""
         addresses = network.addresses() if network.lan else []
+        name = network.name() if network.lan else None
         return {
             "lan": network.lan,
+            "name": f"{name}:{network.port}" if name else None,
             "addresses": [f"{a}:{network.port}" for a in addresses],
             "url": remote_url(addresses[0], network.port, key) if addresses else None,
         }

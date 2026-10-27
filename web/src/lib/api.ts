@@ -61,6 +61,8 @@ export interface State {
 
 export interface Pairing {
   lan: boolean;
+  /** "nanar.local:8642" while that name is announced on the network. */
+  name: string | null;
   addresses: string[];
   url: string | null;
 }

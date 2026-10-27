@@ -4,6 +4,26 @@ import { ApiError, isPaired, pair } from '@/lib/api';
 
 export type PairingStatus = 'checking' | 'paired' | 'unpaired' | 'wrong-key' | 'offline';
 
+/** The name Nanar announces on the local network (src/nanar/discovery.py). */
+export const NAME = 'nanar.local';
+
+/** Whether Nanar answers under that name from this phone, within a second and a half. */
+async function answers(name: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(`http://${name}:${location.port || '80'}/api/health`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false; // the phone can't resolve .local names, or the network keeps it from them
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Reads the key a QR code put after the `#k=`, out of the address bar. */
 export function keyFromHash(hash: string): string | null {
   return new URLSearchParams(hash.replace(/^#/, '')).get('k');
@@ -25,6 +45,12 @@ export function usePairing(): { status: PairingStatus; recheck: () => void } {
       if (key) {
         // Out of the address bar (and of the history) as soon as it has been read.
         history.replaceState(null, '', location.pathname + location.search);
+        // Opened by the PC's IP address (the QR code): move to nanar.local if this phone
+        // reaches it, so that the pairing and the home screen icon outlive a change of Wi-Fi.
+        if (location.hostname !== NAME && (await answers(NAME))) {
+          location.replace(`http://${NAME}:${location.port || '80'}/#k=${key}`);
+          return;
+        }
         try {
           await pair(key);
         } catch (error) {

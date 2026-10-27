@@ -96,6 +96,7 @@ def test_gives_the_tv_the_qr_code_to_show(client: TestClient) -> None:
     pairing = client.get("/api/pairing").json()
     assert pairing == {
         "lan": True,
+        "name": None,
         "addresses": ["192.168.1.10:8642"],
         "url": f"http://192.168.1.10:8642/#k={KEY}",
     }
@@ -104,10 +105,26 @@ def test_gives_the_tv_the_qr_code_to_show(client: TestClient) -> None:
     assert 'xmlns="http://www.w3.org/2000/svg"' in qr.text  # or an <img> shows nothing
 
 
+def test_gives_the_fixed_name_while_it_is_announced(controller: Controller) -> None:
+    network = Network(port=8642, addresses=lambda: ["192.168.1.10"], name=lambda: "nanar.local")
+    client = TestClient(create_app(controller, key=KEY, network=network), client=TV)
+    assert client.get("http://127.0.0.1:8642/api/pairing").json()["name"] == "nanar.local:8642"
+
+
+def test_any_page_may_ask_whether_nanar_answers(phone: TestClient) -> None:
+    response = phone.get("/api/health", headers={"Origin": "http://192.168.1.10:8642"})
+    assert response.headers["access-control-allow-origin"] == "*"
+
+
 def test_says_when_phones_cannot_connect(controller: Controller) -> None:
     app = create_app(controller, key=KEY, network=Network(port=8642, lan=False))
     client = TestClient(app, base_url="http://127.0.0.1:8642", client=TV)
-    assert client.get("/api/pairing").json() == {"lan": False, "addresses": [], "url": None}
+    assert client.get("/api/pairing").json() == {
+        "lan": False,
+        "name": None,
+        "addresses": [],
+        "url": None,
+    }
     assert client.get("/api/pairing/qr.svg").status_code == 404
 
 

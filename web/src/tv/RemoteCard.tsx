@@ -37,7 +37,8 @@ export function RemoteCard({ phones }: { phones: number }) {
     );
   }
 
-  const [main, ...others] = pairing.addresses;
+  // The fixed name first when it is announced, the addresses of this network after it.
+  const [main, ...others] = pairing.name ? [pairing.name, ...pairing.addresses] : pairing.addresses;
   return (
     <aside className={styles.card} data-compact={phones > 0 || undefined}>
       {/* The URL is in the query so that the image changes with the network. */}

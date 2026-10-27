@@ -7,9 +7,12 @@ unpairs every phone.
 
 import ipaddress
 import os
+import re
 import secrets
 import socket
 from pathlib import Path
+
+import ifaddr
 
 KEY_FILE = "remote-key"
 
@@ -31,22 +34,29 @@ def load_key(directory: Path, *, renew: bool = False) -> str:
     return key
 
 
+# Adapters no phone sits behind: virtual machines, containers, WSL, Bluetooth.
+VIRTUAL_ADAPTERS = re.compile(
+    r"hyper-v|vethernet|wsl|virtualbox|vmware|docker|bluetooth|loopback|tap-windows|wintun",
+    re.IGNORECASE,
+)
+
+
 def lan_addresses() -> list[str]:
     """This machine's IPv4 addresses that a phone on the same network may reach, the one of the
     default route first. Read again on each call: the PC may change networks while Nanar runs."""
-    found: list[str] = []
+    primary: str | None = None
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             # Connecting a UDP socket sends nothing: it only picks the outgoing interface.
             probe.connect(("192.0.2.1", 9))  # TEST-NET-1, never routed anywhere
-            found.append(probe.getsockname()[0])
+            primary = probe.getsockname()[0]
     except OSError:
         pass
-    try:
-        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
-        found += [str(info[4][0]) for info in infos]
-    except OSError:
-        pass
+    found = [primary] if primary else []
+    for adapter in ifaddr.get_adapters():
+        if VIRTUAL_ADAPTERS.search(adapter.nice_name):
+            continue
+        found += [ip.ip for ip in adapter.ips if isinstance(ip.ip, str)]
     usable = []
     for address in found:
         ip = ipaddress.IPv4Address(address)
