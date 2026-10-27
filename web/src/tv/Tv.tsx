@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 
-import { command, useLibrary, useLiveState } from '@/lib/api';
+import { command, useLibrary, useLive } from '@/lib/api';
 import { DIRECTIONS, moveFocus } from '@/lib/spatial';
 
 import { Backdrop } from './Backdrop';
 import { GroupPage } from './GroupPage';
 import { Header } from './Header';
 import { Home } from './Home';
+import { RemoteCard } from './RemoteCard';
 import styles from './Tv.module.css';
 import { useIdle } from './useIdle';
 
@@ -16,7 +17,7 @@ const DIM_AFTER_MS = 4 * 60 * 1000;
 /** The TV page, shown in Nanar's window: the library, browsed with the arrows or the mouse. */
 export function Tv() {
   const library = useLibrary();
-  const state = useLiveState();
+  const { state } = useLive();
   const [location, navigate] = useLocation();
   const main = useRef<HTMLElement>(null);
   const idle = useIdle(DIM_AFTER_MS);
@@ -97,6 +98,7 @@ export function Tv() {
           </span>
         )}
       </footer>
+      <RemoteCard phones={state?.phones ?? 0} />
       {error && (
         <p className={styles.error} role="alert">
           {error}
