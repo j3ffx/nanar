@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Privacy, types, lint, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: the privacy check inspects every commit identity, gitleaks every commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # uv picks Python from .python-version.
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          enable-cache: true
+
+      - name: libmpv (for the player tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libmpv2
+
+      - run: npm ci
+      - run: uv sync --locked
+
+      - name: Privacy check (no private file or identity tracked)
+        run: npm run check:private
+
+      - name: Commit messages (Conventional Commits)
+        run: >-
+          node scripts/check-commits.mjs
+          ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}..${{ github.sha }}
+
+      - name: Secrets (gitleaks, whole history)
+        run: |
+          version=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks git --redact --no-banner .
+
+      - run: npm run format:check
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run mypy
+      - run: uv run mypy --platform win32
+      - run: uv run pytest -q
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  windows:
+    name: Tests on Windows (libmpv, window placement)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked
+      - run: uv run python scripts/get-libmpv.py
+      - run: uv run pytest -q
