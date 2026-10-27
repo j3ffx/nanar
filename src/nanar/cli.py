@@ -1,5 +1,6 @@
 """`nanar [FOLDER]`: opens Nanar on a folder of videos (the last one when none is given)."""
 
+import socket
 import sys
 import threading
 from pathlib import Path
@@ -68,6 +69,9 @@ def open_folder(
         settings.save(settings_path)
         library = scan(chosen)
     print(f"Nanar {__version__} : {len(library.videos)} vidéo(s) dans {library.root}")
+    if port_taken(port):
+        print(f"Nanar est déjà ouvert (le port {port} est pris) : ferme l'autre fenêtre d'abord.")
+        raise typer.Exit(1)
 
     # One key for the demo and the real library: a phone paired once stays paired.
     key = load_key(data_dir(), renew=new_key)
@@ -108,6 +112,14 @@ def open_folder(
         announcer.stop()
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def port_taken(port: int) -> bool:
+    """Whether something (often another Nanar) already answers on the port. Asking beats trying
+    to bind it: on Windows a second bind may succeed and the server fail later, out of sight."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
 def main() -> None:
