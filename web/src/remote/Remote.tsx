@@ -2,13 +2,13 @@ import { useLive } from '@/lib/api';
 
 import { Controls } from './Controls';
 import styles from './Remote.module.css';
-import { usePairing } from './usePairing';
+import { usePairing, type Hop } from './usePairing';
 
 /** The phone's page: pairing first, then the remote. */
 export function Remote() {
-  const { status, recheck } = usePairing();
+  const { status, hop, recheck } = usePairing();
 
-  if (status === 'paired') return <Paired onUnpaired={recheck} />;
+  if (status === 'paired') return <Paired hop={hop} onUnpaired={recheck} />;
 
   return (
     <main className={styles.gate}>
@@ -40,7 +40,7 @@ export function Remote() {
   );
 }
 
-function Paired({ onUnpaired }: { onUnpaired: () => void }) {
+function Paired({ hop, onUnpaired }: { hop: Hop; onUnpaired: () => void }) {
   const { state, connected } = useLive();
-  return <Controls state={state} connected={connected} onUnpaired={onUnpaired} />;
+  return <Controls state={state} connected={connected} hop={hop} onUnpaired={onUnpaired} />;
 }

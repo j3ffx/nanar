@@ -53,9 +53,10 @@ mires générées à la volée.
    télécommande s’ouvre ; ajoute-la à l’écran d’accueil pour la retrouver d’un geste.
 
 Nanar s’annonce sur le réseau sous le nom **`nanar.local`** : quand ton téléphone sait trouver ce
-nom (les iPhone toujours, Android selon sa version), la télécommande s’ouvre à l’adresse
-`http://nanar.local:8642`, qui ne change pas d’un Wi-Fi à l’autre. L’icône de l’écran d’accueil
-marche alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau où tu l’as ajoutée, et
+nom (les iPhone toujours, Android selon sa version), la télécommande passe à l’adresse
+`http://nanar.local:8642`, qui ne change pas d’un Wi-Fi à l’autre (si elle n’y passe pas toute
+seule, elle propose un bouton « Ouvrir nanar.local »). Ajoute-la à l’écran d’accueil depuis cette
+adresse : l’icône marchera alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau où tu l’as ajoutée, et
 il faut rescanner le QR code sur un autre Wi-Fi.
 
 Au premier lancement, Windows demande s’il faut laisser Nanar communiquer sur le réseau : accepte

@@ -419,6 +419,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+.hop {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--bg-raised);
+}
+
+.hopLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .toast {
   position: fixed;
   left: 50%;

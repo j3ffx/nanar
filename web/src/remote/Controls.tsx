@@ -13,6 +13,7 @@ import { clock, episodeCode } from '@/lib/format';
 import * as Icon from './icons';
 import styles from './Remote.module.css';
 import { Sheet } from './Sheet';
+import type { Hop } from './usePairing';
 
 // What the phone says when Nanar refuses something.
 const MESSAGES: Record<string, string> = {
@@ -24,10 +25,11 @@ const MESSAGES: Record<string, string> = {
 interface Props {
   state: State | null;
   connected: boolean;
+  hop: Hop;
   onUnpaired: () => void;
 }
 
-export function Controls({ state, connected, onUnpaired }: Props) {
+export function Controls({ state, connected, hop, onUnpaired }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -79,6 +81,19 @@ export function Controls({ state, connected, onUnpaired }: Props) {
             Choisis un film sur la télé. Bientôt, tu pourras aussi parcourir ta bibliothèque d’ici.
           </p>
         </section>
+      )}
+
+      {hop?.state === 'unreachable' && (
+        <aside className={styles.hop}>
+          <p className={styles.note}>
+            Pour que la télécommande marche sur tous les Wi-Fi, ouvre-la sous son nom fixe, puis
+            ajoute-la à l’écran d’accueil.
+            {hop.why === 'timeout' && ' (nanar.local n’a pas répondu tout de suite.)'}
+          </p>
+          <a className={styles.hopLink} href={hop.url}>
+            Ouvrir nanar.local
+          </a>
+        </aside>
       )}
 
       {toast && (

@@ -86,7 +86,8 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - **One name on every network:** `discovery.py` announces `nanar.local` (mDNS) with the
   addresses of the real adapters (`pairing.lan_addresses` leaves out WSL, Hyper-V, VPN tunnels,
   Bluetooth). The QR code holds the IP address, which always works; the page then moves to
-  `nanar.local` when the phone reaches it, so that the cookie and the home screen icon belong to a
+  `nanar.local` when its request there succeeds, or offers a link to it (a browser may refuse a
+  page's request to a `.local` name yet open it as a link), so that the cookie and the home screen icon belong to a
   name that outlives a change of Wi-Fi. `GET /api/health` is the one CORS-readable route, for that
   probe.
 - **The phone's actions show on the TV** (mpv's OSD, `osd=True`); mpv's own keys already do.
