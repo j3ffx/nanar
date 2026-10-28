@@ -4,6 +4,14 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.1.1 — 2026-10-28
+
+### Corrections
+
+- La version Windows s’ouvre enfin quand le zip vient d’un téléchargement : Windows marquait ses
+  fichiers « venus d’Internet », et la fenêtre refusait de se lancer (« Failed to resolve
+  Python.Runtime.Loader.Initialize »). Nanar retire maintenant cette marque de ses propres fichiers.
+
 ## 0.1.0 — 2026-10-27
 
 La première version : Nanar range tes films et tes séries, les affiche sur la télé et sur ton

@@ -53,8 +53,9 @@ Sur **Windows 10 ou 11** :
    [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
 2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
    **`Nanar.exe`**. Rien d’autre à installer.
-3. Nanar n’est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Clique sur
-   « Informations complémentaires », puis « Exécuter quand même ».
+3. Nanar n’est pas signé : Windows peut afficher « Windows a protégé votre ordinateur » ou « Éditeur
+   inconnu ». Clique sur « Informations complémentaires », puis « Exécuter quand même » (ou
+   « Exécuter »).
 4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : accepte pour les
    **réseaux privés**, sinon le téléphone ne trouvera pas le PC.
 5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
