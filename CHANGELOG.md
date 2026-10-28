@@ -4,6 +4,29 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.2.0 — 2026-10-28
+
+Le canapé : choisir quoi regarder sans se lever.
+
+### Nouveautés
+
+- **À suivre**, en tête de la bibliothèque sur la télé et sur le téléphone : les vidéos laissées
+  en cours, et l’épisode (ou le film de la saga) qui suit le dernier que tu as vu, la plus
+  récente d’abord.
+- **Chercher depuis le téléphone** : un champ de recherche (les accents et les majuscules ne
+  comptent pas) et des filtres films, séries, non vus. La télé montre les mêmes résultats ;
+  `Échap` sur la télé revient à toute la bibliothèque.
+- **Des aperçus en glissant la barre de progression** : le téléphone montre l’image du film à
+  l’endroit où tu vas sauter.
+- `Nanar.exe --uninstall` retire Nanar du menu Démarrer et du clic droit sur les dossiers (voir
+  « Désinstaller » dans le README).
+- Les propriétés de `Nanar.exe` indiquent son nom et sa version.
+
+### Corrections
+
+- En mode démo, la barre de progression et les boutons ±10 s et ±1 min marchent enfin (en
+  arrière, jusqu’à une trentaine de secondes).
+
 ## 0.1.1 — 2026-10-28
 
 ### Corrections

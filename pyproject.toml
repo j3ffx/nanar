@@ -1,6 +1,6 @@
 [project]
 name = "nanar"
-version = "0.1.1"
+version = "0.2.0"
 description = "Tes films sur la télé, la télécommande dans le téléphone : un lecteur vidéo pour PC piloté depuis le canapé."
 readme = "README.md"
 license = "GPL-3.0-only"
