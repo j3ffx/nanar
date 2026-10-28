@@ -58,9 +58,9 @@ Sur **Windows 10 ou 11** :
    [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
 2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
    **`Nanar.exe`**. Rien d’autre à installer.
-3. Nanar n’est pas encore signé ([Code signing policy](#code-signing-policy)) : Windows peut afficher « Windows a protégé votre ordinateur » ou « Éditeur
-   inconnu ». Clique sur « Informations complémentaires », puis « Exécuter quand même » (ou
-   « Exécuter »).
+3. Nanar n’est pas encore signé ([Code signing policy](#code-signing-policy)) : Windows peut
+   afficher « Windows a protégé votre ordinateur » ou « Éditeur inconnu ». Clique sur
+   « Informations complémentaires », puis « Exécuter quand même » (ou « Exécuter »).
 4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : accepte pour les
    **réseaux privés**, sinon le téléphone ne trouvera pas le PC.
 5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
@@ -139,14 +139,15 @@ Pendant un film, les habitudes de VLC :
 
 La politique de signature du code de Nanar, pour la version Windows.
 
-**Où en est-on :** Nanar a demandé la signature gratuite que SignPath Foundation offre aux
-projets libres. Tant qu’elle n’est pas accordée, les versions publiées ne sont pas signées
-(d’où l’« Éditeur inconnu » à l’installation). Une fois accordée, chaque version le sera :
+**Où en est-on :** les versions publiées ne sont pas signées (d’où l’« Éditeur inconnu » à
+l’installation). SignPath Foundation signe gratuitement des projets libres, mais réserve son
+programme à ceux qui sont déjà connus : Nanar refera sa demande quand il le sera. Une fois
+accordée, chaque version le sera :
 
 > Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
 > [SignPath Foundation](https://signpath.org/).
 
-**Ce qui est signé :** `Nanar.exe` seulement, construit par
+**Ce qui sera signé :** `Nanar.exe` seulement, construit par
 [GitHub Actions](.github/workflows/release.yml) à partir du code de ce dépôt, au moment de la
 publication. Les bibliothèques des autres projets livrées à côté (libmpv, Python, .NET…)
 gardent leur propre signature, ou n’en ont pas.
