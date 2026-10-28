@@ -53,7 +53,7 @@ Sur **Windows 10 ou 11** :
    [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
 2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
    **`Nanar.exe`**. Rien d’autre à installer.
-3. Nanar n’est pas signé : Windows peut afficher « Windows a protégé votre ordinateur » ou « Éditeur
+3. Nanar n’est pas encore signé ([Code signing policy](#code-signing-policy)) : Windows peut afficher « Windows a protégé votre ordinateur » ou « Éditeur
    inconnu ». Clique sur « Informations complémentaires », puis « Exécuter quand même » (ou
    « Exécuter »).
 4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : accepte pour les
@@ -124,6 +124,37 @@ Pendant un film, les habitudes de VLC :
 | `F`, double clic | plein écran                          |
 | `Échap`          | quitter le plein écran               |
 | `S`, `Q`         | arrêter et revenir à la bibliothèque |
+
+## Code signing policy
+
+La politique de signature du code de Nanar, pour la version Windows.
+
+**Où en est-on :** Nanar a demandé la signature gratuite que SignPath Foundation offre aux
+projets libres. Tant qu’elle n’est pas accordée, les versions publiées ne sont pas signées
+(d’où l’« Éditeur inconnu » à l’installation). Une fois accordée, chaque version le sera :
+
+> Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
+> [SignPath Foundation](https://signpath.org/).
+
+**Ce qui est signé :** `Nanar.exe` seulement, construit par
+[GitHub Actions](.github/workflows/release.yml) à partir du code de ce dépôt, au moment de la
+publication. Les bibliothèques des autres projets livrées à côté (libmpv, Python, .NET…)
+gardent leur propre signature, ou n’en ont pas.
+
+**Qui fait quoi :**
+
+- auteurs (modifient le code sans autre relecture) : [j3ffx](https://github.com/j3ffx) ;
+- relecteurs (relisent toute contribution extérieure avant de l’accepter) :
+  [j3ffx](https://github.com/j3ffx) ;
+- approbateurs (valident chaque demande de signature, à la main) :
+  [j3ffx](https://github.com/j3ffx).
+
+**Confidentialité :** _This program will not transfer any information to other networked systems
+unless specifically requested by the user or the person installing or operating it._ Nanar ne
+parle qu’aux téléphones que tu as appairés sur ton réseau local, jamais à Internet : pas de
+compte, pas de statistiques, pas de jaquettes téléchargées. Les bibliothèques qu’il embarque
+(mpv, guessit, pywebview, zeroconf…) n’envoient rien non plus ; `nanar.local` est annoncé sur le
+réseau local seulement.
 
 ## Contribuer
 
