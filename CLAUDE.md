@@ -76,9 +76,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - **Progress** (`progress.py`, SQLite) is keyed by library folder and path inside it, saved every
   ten seconds of playback and on stop; past 90 % a video is watched (and stays so).
 - **Pictures** (`thumbnails.py`): the user's poster first, else one frame grabbed by libmpv in the
-  background (never anything from the Internet); their URL carries the file's age.
-- **The TV follows the phone** (`set_view`): the page and the item a phone looks at; not the
-  other way round.
+  background (never anything from the Internet); their URL carries the file's age. The phone's
+  progress bar shows frames of the video playing (`previews.py`), grabbed when asked.
+- **The TV follows the phone** (`set_view`): the page, the item and the search a phone looks
+  at; not the other way round.
 - **mpv's callbacks never wait.** They come from mpv's event thread, and closing mpv waits for that
   thread: whatever they report runs on the controller's worker thread (`controller.py`).
 - **Languages:** French audio first, then English; French subtitles, left off when the audio is
@@ -123,9 +124,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - `src/nanar/`: Python package. `library.py` (reading release names with guessit, sagas and
   series), `player.py` (one mpv window per video, VLC-like keys), `controller.py` (the single place
   where state changes), `app.py` (API, WebSocket, pages, manifest), `security.py` and
-  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `progress.py`,
-  `thumbnails.py`, `watcher.py` (the folder, followed), `desktop/` (the pywebview window, Win32
-  calls placing windows), `demo.py` (made-up library played from mpv's `lavfi` sources), `cli.py`.
+  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `progress.py` (and "À
+  suivre"), `thumbnails.py`, `previews.py` (frames for the progress bar), `watcher.py` (the
+  folder, followed), `desktop/` (the pywebview window, Win32 calls placing windows), `demo.py`
+  (made-up library played from mpv's `lavfi` sources), `cli.py`.
   `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
   real libmpv without video or sound).
 - `web/`: the pages (Vite, React, CSS Modules, wouter). `/tv` is the TV page (`src/tv/`, arrow-key

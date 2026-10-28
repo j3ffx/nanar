@@ -58,11 +58,28 @@ def shot(url: str, name: str, size: str) -> None:
     print(name)
 
 
+def watch_a_little(data: str) -> None:
+    """Something watched, something left in the middle: "À suivre" has a few videos to show."""
+    from nanar import demo
+    from nanar.progress import Progress
+
+    videos = list(demo.library().videos.values())  # in the order of demo.NAMES
+    folder = Path(data) / "demo"
+    folder.mkdir(parents=True, exist_ok=True)
+    progress = Progress(folder / "progress.db")
+    seen = [(4, 0.0, True), (3, 0.0, True), (10, 140.0, False), (5, 95.0, False)]
+    for index, position, finished in seen:
+        progress.save("Démo", videos[index].path, position, demo.SECONDS, finished=finished)
+        time.sleep(0.05)  # one after the other: the most recent comes first
+    progress.close()
+
+
 def main() -> int:
     DOCS.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="nanar-screenshots-", ignore_cleanup_errors=True
     ) as data:
+        watch_a_little(data)
         env = os.environ | {"NANAR_DATA_DIR": data, "NANAR_SHOW_ADDRESS": "192.0.2.10"}
         nanar = subprocess.Popen(
             [sys.executable, "-m", "nanar", "--demo", "--headless"],

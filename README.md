@@ -30,7 +30,8 @@ transforme le téléphone en télécommande](docs/capture-tele.png)
   à côté (`Film.jpg`, ou `poster.jpg` dans son dossier), sinon une image tirée du film lui-même.
 - **Reprendre là où tu t’étais arrêté.** Nanar retient où tu en es dans chaque vidéo, coche celles
   que tu as vues, et enchaîne l’épisode suivant après un compte à rebours de dix secondes (`N`
-  pour lancer tout de suite, `S` pour arrêter).
+  pour lancer tout de suite, `S` pour arrêter). En tête de la bibliothèque, « À suivre » te
+  remet sous les yeux le film laissé en cours et l’épisode qui suit le dernier que tu as vu.
 - **Toujours à jour.** Un film qui finit de se télécharger dans le dossier apparaît tout seul.
 - **Une fenêtre, comme un lecteur vidéo.** L’accueil s’anime pendant que tu choisis ; le film
   s’ouvre à la même place, à la même taille, et Nanar revient quand il s’arrête. En fenêtre ou en
@@ -40,6 +41,9 @@ transforme le téléphone en télécommande](docs/capture-tele.png)
   un film (la télé suit ce que tu regardes, pour que tout le monde voie), puis lecture, pause,
   ±10 s, ±1 min, épisode suivant, volume, pistes audio et sous-titres, plein écran. La télé affiche
   ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
+- **Trouver vite.** Cherche un titre depuis le téléphone (les accents ne comptent pas), ou ne
+  garde que les films, les séries, ce que tu n’as pas vu : la télé montre les mêmes résultats. En
+  glissant la barre de progression, tu vois l’image du film à cet endroit.
 - **Tout se lit.** Le moteur de [mpv](https://mpv.io/) : tous les formats courants, les pistes
   audio et les sous-titres, le HDR. Nanar choisit la VF, sinon la VO avec les sous-titres français.
 - **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques, pas même une jaquette
