@@ -53,6 +53,12 @@
   padding: 16px 16px 8px 0;
 }
 
+.nothing {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--text-muted);
+}
+
 .empty {
   display: grid;
   gap: 8px;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import type { Filter } from './filter';
+
 // The shapes the Python API sends (src/nanar/library.py, src/nanar/controller.py).
 
 export interface Video {
@@ -77,7 +79,7 @@ export interface State {
   playing: Playing | null;
   upNext: UpNext | null;
   /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
-  view: { path: string; focus: string | null; seq: number };
+  view: { path: string; focus: string | null; filter: Filter; seq: number };
   /** The Windows build asks once to add Nanar to the Start menu and the right-click menu. */
   offerIntegration: boolean;
 }
@@ -123,9 +125,10 @@ export const chooseFolder = () => send('/api/open', { choose: true });
 /** This machine only: adds (or not) Nanar to the Start menu and the right-click menu. */
 export const answerIntegration = (install: boolean) => send('/api/integration', { install });
 
-/** Tells the TV what this phone looks at: the TV page's path ("/", "/g/<id>") and an item. */
-export const setView = (path: string, focus: string | null = null) =>
-  send('/api/view', { path, focus });
+/** Tells the TV what this phone looks at: the TV page's path ("/", "/g/<id>"), an item, and
+ *  what the library shows. */
+export const setView = (path: string, focus: string | null = null, filter?: Filter) =>
+  send('/api/view', { path, focus, filter });
 
 /** Whether this browser may drive Nanar (a paired phone, or this machine). */
 export async function isPaired(): Promise<boolean> {

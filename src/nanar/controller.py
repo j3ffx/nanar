@@ -32,6 +32,7 @@ PLAYER_ACTIONS = frozenset(
 UP_NEXT_SECONDS = 10  # the countdown before the next episode
 TICK = 1.0  # one second of that countdown (shorter in tests)
 SAVE_EVERY = 10.0  # seconds of playback between two saves of where a video is
+NO_FILTER: dict[str, Any] = {"query": "", "kind": "all", "unwatched": False}
 
 
 class WindowHost(Protocol):
@@ -102,7 +103,7 @@ class Controller:
         self._up_next: Video | None = None
         self._up_next_seconds = 0
         self._countdown: threading.Timer | None = None
-        self._view: dict[str, Any] = {"path": "/", "focus": None, "seq": 0}
+        self._view: dict[str, Any] = {"path": "/", "focus": None, "filter": NO_FILTER, "seq": 0}
         self._offer_integration = False
 
     # Listeners ---------------------------------------------------------------------------------
@@ -196,13 +197,18 @@ class Controller:
         # The file's age in the URL: a new picture is a new address, and caches stay right.
         return f"/api/thumb/{kind}/{ident}?v={int(path.stat().st_mtime)}"
 
-    def set_view(self, path: str, focus: str | None) -> None:
-        """What a phone is looking at in the library: the TV page follows it, so that the
-        whole room sees the choice being made."""
+    def set_view(self, path: str, focus: str | None, filter: dict[str, Any] | None = None) -> None:
+        """What a phone is looking at in the library (its page, the item picked, what it
+        searches): the TV page follows it, so that the whole room sees the choice being made."""
         if not path.startswith("/") or len(path) > 200:
             raise CommandError("bad_value")
         with self._lock:
-            self._view = {"path": path, "focus": focus, "seq": self._view["seq"] + 1}
+            self._view = {
+                "path": path,
+                "focus": focus,
+                "filter": dict(filter or NO_FILTER),
+                "seq": self._view["seq"] + 1,
+            }
         self._announce()
 
     def set_integration_offer(self, offer: bool) -> None:

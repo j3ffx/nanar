@@ -9,12 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import segno
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nanar import __version__
 from nanar.controller import CommandError, Controller
@@ -34,9 +34,16 @@ class CommandBody(BaseModel):
     value: Any = None
 
 
+class ViewFilter(BaseModel):
+    query: str = Field(default="", max_length=100)  # words searched in the titles
+    kind: Literal["all", "films", "series"] = "all"
+    unwatched: bool = False
+
+
 class ViewBody(BaseModel):
     path: str  # the TV page's path: "/" or "/g/<group>"
     focus: str | None = None  # the video or group to put forward
+    filter: ViewFilter = Field(default_factory=ViewFilter)  # what the library shows
 
 
 class OpenBody(BaseModel):
@@ -127,7 +134,7 @@ def create_app(
 
     @app.post("/api/view", status_code=204)
     async def view(body: ViewBody) -> None:
-        controller.set_view(body.path, body.focus)
+        controller.set_view(body.path, body.focus, body.filter.model_dump())
 
     @app.post("/api/open", status_code=204, response_model=None)
     async def open_folder(body: OpenBody, request: Request) -> JSONResponse | None:

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 
 import { command, useLibrary, useLive } from '@/lib/api';
+import { isFiltered, NO_FILTER, type Filter } from '@/lib/filter';
 import { DIRECTIONS, moveFocus } from '@/lib/spatial';
 
 import { Backdrop } from './Backdrop';
@@ -33,6 +34,7 @@ export function Tv() {
   const main = useRef<HTMLElement>(null);
   const idle = useIdle(DIM_AFTER_MS);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>(NO_FILTER);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -49,6 +51,9 @@ export function Tv() {
         if (location !== '/') {
           event.preventDefault();
           navigate('/');
+        } else if (isFiltered(filter)) {
+          event.preventDefault();
+          setFilter(NO_FILTER); // back to the whole library
         } else if (event.key === 'Escape' && state?.fullscreen) {
           command('fullscreen', false).catch(() => {});
         }
@@ -56,7 +61,7 @@ export function Tv() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [location, navigate, state?.fullscreen]);
+  }, [location, navigate, state?.fullscreen, filter]);
 
   // The TV follows what a phone looks at: its page, and the film it picked. Not on first load
   // (the TV opens on its own home), only when a phone moves.
@@ -70,6 +75,7 @@ export function Tv() {
       return;
     }
     followed.current = view.seq;
+    setFilter(view.filter);
     if (view.path !== location) {
       pending.current = view.focus ?? '';
       navigate(view.path);
@@ -93,7 +99,7 @@ export function Tv() {
     if (main.current.contains(document.activeElement)) return;
     const back = location === '/' ? findItem(main.current, lastGroup.current) : null;
     (back ?? main.current.querySelector<HTMLElement>('[data-nav]'))?.focus();
-  }, [library, location]);
+  }, [library, location, filter]);
 
   const onError = (message: string) => {
     setError(message);
@@ -115,6 +121,7 @@ export function Tv() {
             <Route>
               <Home
                 library={library}
+                filter={filter}
                 offerIntegration={!!state?.offerIntegration}
                 onError={onError}
               />
@@ -129,7 +136,7 @@ export function Tv() {
         <span>
           <kbd>F</kbd> Plein écran
         </span>
-        {location !== '/' && (
+        {(location !== '/' || isFiltered(filter)) && (
           <span>
             <kbd>Échap</kbd> Retour
           </span>

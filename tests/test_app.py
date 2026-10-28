@@ -229,8 +229,24 @@ def test_the_tv_follows_what_a_phone_looks_at(client: TestClient, phone: TestCli
     before = client.get("/api/state").json()["view"]["seq"]
     assert phone.post("/api/view", json={"path": "/g/abc", "focus": "v1"}).status_code == 204
     view = client.get("/api/state").json()["view"]
-    assert view == {"path": "/g/abc", "focus": "v1", "seq": before + 1}
+    assert view == {
+        "path": "/g/abc",
+        "focus": "v1",
+        "filter": {"query": "", "kind": "all", "unwatched": False},
+        "seq": before + 1,
+    }
     assert phone.post("/api/view", json={"path": "http://evil"}).status_code == 409
+
+
+def test_the_tv_shows_what_a_phone_searches(client: TestClient, phone: TestClient) -> None:
+    pair(phone)
+    searched = {"query": "requin", "kind": "films", "unwatched": True}
+    assert phone.post("/api/view", json={"path": "/", "filter": searched}).status_code == 204
+    assert client.get("/api/state").json()["view"]["filter"] == searched
+    wrong = {"path": "/", "filter": {"kind": "everything"}}
+    assert phone.post("/api/view", json=wrong).status_code == 422
+    too_long = {"path": "/", "filter": {"query": "x" * 101}}
+    assert phone.post("/api/view", json=too_long).status_code == 422
 
 
 def test_serves_the_pictures_it_has(client: TestClient) -> None:
