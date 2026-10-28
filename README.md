@@ -65,6 +65,11 @@ Le fichier `.sha256` à côté du zip permet de vérifier qu’il n’a pas ét�
 progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier de Nanar :
 pour une nouvelle version, remplace simplement le dossier.
 
+**Désinstaller :** si tu as accepté le menu Démarrer et le clic droit, retire-les d’abord : dans
+le dossier `Nanar`, clic droit dans le vide → « Ouvrir dans le Terminal », puis
+`.\Nanar.exe --uninstall`. Supprime ensuite le dossier `Nanar`, et `%LOCALAPPDATA%\nanar` si tu
+veux aussi effacer tes réglages et ta progression.
+
 ### Depuis les sources
 
 Sur Linux, macOS, ou pour contribuer. Il faut [uv](https://docs.astral.sh/uv/),

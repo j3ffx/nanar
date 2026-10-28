@@ -52,6 +52,9 @@ def open_folder(
     dev: Annotated[
         bool, typer.Option(help="La page vient du serveur Vite (npm run dev).", hidden=True)
     ] = False,
+    uninstall: Annotated[
+        bool, typer.Option(help="Retire Nanar du menu Démarrer et du clic droit sur les dossiers.")
+    ] = False,
     version: Annotated[bool, typer.Option("--version", help="Affiche la version.")] = False,
     self_check: Annotated[
         bool, typer.Option(help="Charge la fenêtre et libmpv, puis s'arrête.", hidden=True)
@@ -63,6 +66,9 @@ def open_folder(
         return
     if self_check:
         check_parts()
+        return
+    if uninstall:
+        remove_integration()
         return
     if port_taken(port):
         hand_over(port, folder)
@@ -225,6 +231,25 @@ def offers_integration(settings: Settings) -> bool:
     if integration.is_installed(Path(sys.executable)):
         return False
     return not settings.integration_answered
+
+
+def remove_integration() -> None:
+    """`--uninstall`: takes back what the offer on the TV page installed, and stops offering it.
+    The rest is the unzipped folder and the data directory, which the user deletes."""
+    settings_path = data_dir() / "settings.json"
+    settings = Settings.load(settings_path)
+    if sys.platform == "win32":
+        from nanar.desktop import integration
+
+        integration.uninstall()
+    settings.integration_answered = True
+    settings.save(settings_path)
+    message = "Nanar n'est plus dans le menu Démarrer ni dans le clic droit sur les dossiers."
+    print(message)
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        from nanar.desktop import win32
+
+        win32.message_box("Nanar", message)
 
 
 def check_parts() -> None:

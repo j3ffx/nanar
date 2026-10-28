@@ -50,6 +50,7 @@ user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
 user32.AllowSetForegroundWindow.argtypes = [wintypes.DWORD]
 _SW_RESTORE = 9
 _ASFW_ANY = 0xFFFFFFFF
+_MB_ICONINFORMATION = 0x40
 _IMAGE_ICON = 1
 _LR_LOADFROMFILE = 0x0010
 _WM_SETICON = 0x0080
@@ -152,3 +153,8 @@ def allow_any_foreground() -> None:
     """Lets another process (the Nanar already open) come to the front: Windows only allows it
     to the process the user just started, which is this one."""
     user32.AllowSetForegroundWindow(_ASFW_ANY)
+
+
+def message_box(title: str, text: str) -> None:
+    """A plain message with an OK button: what the build, which has no console, prints."""
+    user32.MessageBoxW(None, text, title, _MB_ICONINFORMATION)
