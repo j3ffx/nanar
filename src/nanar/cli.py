@@ -81,6 +81,7 @@ def open_folder(
     from nanar.library import Library
     from nanar.pairing import load_key
     from nanar.player import MpvSession
+    from nanar.previews import Previews
     from nanar.progress import Progress
     from nanar.thumbnails import Thumbnails
 
@@ -105,6 +106,7 @@ def open_folder(
     )
     thumbnails = Thumbnails(data_dir(demo=demo) / "thumbnails", on_ready=controller.library_changed)
     controller.thumbnails = thumbnails
+    controller.previews = Previews(data_dir(demo=demo) / "previews")
     if not demo:  # the demo keeps its coloured cards: frames of test patterns show nothing
         thumbnails.schedule(library)
     folders = Folders(controller, settings, None if demo else settings_path)

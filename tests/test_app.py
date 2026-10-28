@@ -10,6 +10,7 @@ from nanar.app import Network, create_app
 from nanar.config import Settings
 from nanar.controller import Controller
 from nanar.library import build
+from nanar.previews import Previews
 
 from .fakes import FakeSessions
 
@@ -252,6 +253,23 @@ def test_the_tv_shows_what_a_phone_searches(client: TestClient, phone: TestClien
 def test_serves_the_pictures_it_has(client: TestClient) -> None:
     assert client.get("/api/thumb/v/nope").status_code == 404
     assert client.get("/api/thumb/x/nope").status_code == 404
+
+
+def test_previews_frames_of_the_video_playing_only(
+    client: TestClient, controller: Controller, tmp_path: Path
+) -> None:
+    def grab(source: str, at: float, destination: Path) -> bool:
+        destination.write_bytes(f"{at}".encode())
+        return True
+
+    controller.previews = Previews(tmp_path / "previews", grab=grab)
+    film = first_film(client)
+    nothing = client.get(f"/api/preview/{film}?at=60")
+    assert nothing.status_code == 409
+    assert nothing.json() == {"code": "nothing_playing"}
+    controller.play(film)
+    assert client.get(f"/api/preview/{film}?at=62").content == b"60"
+    assert client.get("/api/preview/other?at=62").status_code == 409
 
 
 class FakeDesktop:

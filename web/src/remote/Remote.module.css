@@ -135,9 +135,37 @@
 }
 
 .progress {
+  position: relative;
   display: grid;
   gap: 6px;
   margin-top: 14px;
+}
+
+/* While dragging, under the bar (where the screen is empty): the frame it points at, and its
+   time. */
+.preview {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(82%, 340px);
+  padding: 8px;
+  border-radius: 18px;
+  background: var(--bg);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.6);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.preview img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--bg-sunk);
 }
 
 /* The progress bar is a slider: thin at rest, the thumb big enough for a thumb. */

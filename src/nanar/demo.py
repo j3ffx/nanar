@@ -3,6 +3,8 @@
 It needs no file at all, so development, tests and screenshots never touch anyone's films.
 """
 
+import re
+
 from nanar.library import Library, build
 
 # Fictitious titles, laid out as downloaded files usually are.
@@ -40,6 +42,19 @@ def source(index: int, seconds: int = SECONDS) -> str:
         f"sine=frequency={tone}:duration={seconds}[out1];"
         f"sine=frequency={tone * 2}:duration={seconds}[out2]"
     )
+
+
+def is_generated(source: str) -> bool:
+    return source.startswith("av://lavfi:")
+
+
+def from_time(source: str, at: float) -> str:
+    """The picture of a generated video from `at` seconds on, small and silent. Its stream can't
+    seek: the frames before are generated (quickly, at that size) and dropped."""
+    picture = source.removeprefix("av://lavfi:").split(";")[0]
+    picture = re.sub(r"size=\d+x\d+", "size=320x180", picture)
+    picture = re.sub(r"duration=\d+", f"duration={at + 1:g}", picture)
+    return "av://lavfi:" + picture.replace("[out0]", f",trim=start={at:g}[out0]")
 
 
 def library() -> Library:

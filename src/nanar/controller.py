@@ -22,6 +22,7 @@ from nanar.player import Playback, Rect, Session, SessionFactory, Start
 from nanar.progress import Progress, to_continue
 
 if TYPE_CHECKING:
+    from nanar.previews import Previews
     from nanar.thumbnails import Thumbnails
 
 Listener = Callable[[dict[str, Any]], None]
@@ -80,6 +81,7 @@ class Controller:
         *,
         progress: Progress | None = None,
         thumbnails: "Thumbnails | None" = None,
+        previews: "Previews | None" = None,
         demo: bool = False,
     ) -> None:
         self.library = library
@@ -87,6 +89,7 @@ class Controller:
         self.window: WindowHost = window or NoWindow()
         self.progress = progress or Progress(None)
         self.thumbnails = thumbnails
+        self.previews = previews
         self._settings_path = settings_path
         self._sessions = sessions
         self._demo = demo
@@ -189,6 +192,16 @@ class Controller:
             return self.thumbnails.of_group(self.library, ident)
         video = self.library.videos.get(ident)
         return self.thumbnails.of_video(self.library, video) if video else None
+
+    def preview(self, video_id: str, at: float) -> Path | None:
+        """A frame of the video playing, near `at` seconds: the phone's progress bar shows it
+        while the finger drags."""
+        with self._lock:
+            if self._video is None or self._video.id != video_id:
+                raise CommandError("nothing_playing")
+            source = self._source_of(self._video)
+        # Out of the lock: grabbing takes a moment, and the state must not wait for it.
+        return self.previews.frame(source, at) if self.previews else None
 
     def _thumb_url(self, kind: str, ident: str) -> str | None:
         path = self.thumbnail(kind, ident)

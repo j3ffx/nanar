@@ -146,8 +146,11 @@ def _source_of(library: Library, video: Video) -> str:
     return video.path if "://" in video.path else str(Path(library.root) / video.path)
 
 
-def grab_frame(source: str, destination: Path) -> bool:
-    """One frame a quarter into the video (eight seconds into a generated one), as a JPEG."""
+def grab_frame(
+    source: str, destination: Path, *, start: str | None = None, width: int = 480
+) -> bool:
+    """One frame, as a JPEG: at `start` (mpv's syntax), by default a quarter into the video
+    (eight seconds into a generated one)."""
     from nanar.player import _load_mpv
 
     mpv = _load_mpv()
@@ -162,9 +165,9 @@ def grab_frame(source: str, destination: Path) -> bool:
             aid="no",
             sid="no",
             frames=1,
-            start="8" if "://" in source else "25%",
+            start=start or ("8" if "://" in source else "25%"),
             hr_seek="no",  # the keyframe before is close enough, and much faster
-            vf="scale=480:-2",
+            vf=f"scale={width}:-2",
             hwdec="no",
             idle="yes",
             ytdl=False,

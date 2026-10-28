@@ -175,7 +175,12 @@ function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
           {video.kind === 'episode' ? (video.episodeTitle ?? video.title) : video.title}
         </h1>
         {video.kind === 'episode' && <p className={styles.series}>{video.title}</p>}
-        <Progress position={playing.position} duration={playing.duration} send={send} />
+        <Progress
+          videoId={video.id}
+          position={playing.position}
+          duration={playing.duration}
+          send={send}
+        />
       </section>
 
       <section className={styles.pad} aria-label="Lecture">
@@ -251,20 +256,57 @@ function selectedLabel(tracks: Track[]): string | null {
   return tracks.find((t) => t.selected)?.label ?? null;
 }
 
+const PREVIEW_STEP = 5; // seconds between two frames (src/nanar/previews.py rounds the same)
+
 /**
- * Where the video is, and where to go: the bar follows the finger (the time it would jump to
- * shows big), and the video jumps there when the finger lifts.
+ * The frame of the video near `target` seconds, while the finger drags. One picture is asked
+ * at a time: when it arrives, the next one is for wherever the finger is by then.
+ */
+function usePreview(videoId: string, target: number | null): string | null {
+  const [shown, setShown] = useState<string | null>(null);
+  const wanted = useRef<string | null>(null);
+  const loading = useRef(false);
+  useEffect(() => {
+    wanted.current =
+      target === null
+        ? null
+        : `/api/preview/${videoId}?at=${Math.round(target / PREVIEW_STEP) * PREVIEW_STEP}`;
+    const load = () => {
+      const url = wanted.current;
+      if (loading.current || url === null) return;
+      loading.current = true;
+      const image = new Image();
+      const settle = (ok: boolean) => {
+        loading.current = false;
+        if (ok) setShown(url);
+        if (wanted.current !== url) load();
+      };
+      image.onload = () => settle(true);
+      image.onerror = () => settle(false);
+      image.src = url;
+    };
+    load();
+  }, [videoId, target]);
+  return target === null ? null : shown;
+}
+
+/**
+ * Where the video is, and where to go: the bar follows the finger (the frame and the time it
+ * would jump to show big), and the video jumps there when the finger lifts.
  */
 function Progress({
+  videoId,
   position,
   duration,
   send,
 }: {
+  videoId: string;
   position: number;
   duration: number | null;
   send: Send;
 }) {
   const [target, setTarget] = useState<number | null>(null);
+  const frame = usePreview(videoId, target);
   const shown = target ?? position;
   const ratio = duration ? Math.min(1, shown / duration) : 0;
   const commit = () => {
@@ -273,7 +315,12 @@ function Progress({
   };
   return (
     <div className={styles.progress} data-seeking={target !== null || undefined}>
-      {target !== null && <p className={styles.seekTo}>{clock(target)}</p>}
+      {target !== null && (
+        <div className={styles.preview}>
+          {frame && <img src={frame} alt="" />}
+          <p className={styles.seekTo}>{clock(target)}</p>
+        </div>
+      )}
       <input
         type="range"
         className={styles.scrub}

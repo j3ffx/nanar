@@ -122,6 +122,14 @@ def create_app(
         # Its address changes with the picture (?v=…): it may be kept for long.
         return FileResponse(path, headers={"Cache-Control": "private, max-age=31536000"})
 
+    @app.get("/api/preview/{video_id}", response_model=None)
+    async def preview(video_id: str, at: float) -> FileResponse | JSONResponse:
+        path = await asyncio.to_thread(controller.preview, video_id, at)
+        if path is None:
+            return JSONResponse({"code": "no_preview"}, status_code=404)
+        # One address per video and time, the same picture for the whole run.
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+
     @app.post("/api/play", status_code=204)
     async def play(body: PlayBody) -> None:
         await asyncio.to_thread(controller.play, body.videoId, body.start)
