@@ -3,7 +3,7 @@ import { Link, useLocation, useRoute } from 'wouter';
 
 import { play, setView, type Library as LibraryData, type Video } from '@/lib/api';
 import { clock, countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
-import { groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
+import { continueLabel, groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
 
 import styles from './Library.module.css';
 import { Sheet } from './Sheet';
@@ -78,6 +78,30 @@ export function Library({ library, onStarted, onError }: Props) {
           <h1 className={styles.heading}>Bibliothèque</h1>
           {library.entries.length === 0 && (
             <p className={styles.loading}>Rien à l’affiche… pour l’instant.</p>
+          )}
+          {library.continue.length > 0 && (
+            <>
+              <h2 className={styles.subheading}>À suivre</h2>
+              <div className={styles.shelf}>
+                {library.continue.map((id) => {
+                  const v = library.videos[id];
+                  if (!v) return null;
+                  const { title, detail } = continueLabel(library, v);
+                  return (
+                    <Card
+                      key={id}
+                      id={id}
+                      title={title}
+                      detail={detail}
+                      image={v.thumb}
+                      progress={ratioOf(v)}
+                      onClick={() => setPicked(v)}
+                    />
+                  );
+                })}
+              </div>
+              <h2 className={styles.subheading}>Tout</h2>
+            </>
           )}
           <div className={styles.grid}>
             {library.entries.map(({ kind, id }) => {

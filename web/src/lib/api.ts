@@ -40,6 +40,8 @@ export interface Library {
   videos: Record<string, Video>;
   groups: Record<string, Group>;
   entries: { kind: 'video' | 'group'; id: string }[];
+  /** "À suivre": videos left in the middle, and the next of a saga or a series. */
+  continue: string[];
 }
 
 export interface Track {

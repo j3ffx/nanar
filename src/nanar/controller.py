@@ -19,7 +19,7 @@ from nanar import demo
 from nanar.config import Settings
 from nanar.library import Library, Video
 from nanar.player import Playback, Rect, Session, SessionFactory, Start
-from nanar.progress import Progress
+from nanar.progress import Progress, to_continue
 
 if TYPE_CHECKING:
     from nanar.thumbnails import Thumbnails
@@ -177,6 +177,7 @@ class Controller:
                     if entry
                     else None
                 )
+            data["continue"] = to_continue(self.library, saved)
             return data
 
     def thumbnail(self, kind: str, ident: str) -> Path | None:

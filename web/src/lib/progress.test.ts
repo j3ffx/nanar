@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Group, Library, Video } from './api';
-import { groupNext, groupWatched, ratioOf, resumeLabel } from './progress';
+import { continueLabel, groupNext, groupWatched, ratioOf, resumeLabel } from './progress';
 
 const video = (id: string, progress: Video['progress']): Video => ({
   id,
@@ -18,8 +18,9 @@ const video = (id: string, progress: Video['progress']): Video => ({
 const library = (videos: Video[]): Library => ({
   root: '/films',
   videos: Object.fromEntries(videos.map((v) => [v.id, v])),
-  groups: {},
+  groups: { g: group },
   entries: [],
+  continue: [],
 });
 
 const group: Group = { id: 'g', kind: 'series', title: 'S', videos: ['e1', 'e2', 'e3'] };
@@ -51,5 +52,21 @@ describe('progress', () => {
     const done = library([video('e1', watched), video('e2', watched), video('e3', watched)]);
     expect(groupWatched(done, group)).toBe(true);
     expect(groupNext(done, group)?.id).toBe('e1');
+  });
+
+  it('names what to continue by its series, then where it stands', () => {
+    const lib = library([
+      video('e1', { position: 0, duration: 1200, watched: true }),
+      video('e2', { position: 600, duration: 1200, watched: false }),
+      video('e3', null),
+    ]);
+    expect(continueLabel(lib, lib.videos.e2!)).toEqual({
+      title: 'S',
+      detail: 'S01E02 · Reprendre à 10:00',
+    });
+    expect(continueLabel(lib, lib.videos.e3!)).toEqual({
+      title: 'S',
+      detail: 'S01E03 · Épisode suivant',
+    });
   });
 });

@@ -2,7 +2,7 @@ import { useLocation } from 'wouter';
 
 import { answerIntegration, chooseFolder, play, type Library } from '@/lib/api';
 import { countLabel } from '@/lib/format';
-import { groupWatched, ratioOf } from '@/lib/progress';
+import { continueLabel, groupWatched, ratioOf } from '@/lib/progress';
 
 import { Poster } from './Poster';
 import styles from './Tv.module.css';
@@ -14,7 +14,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-/** The whole library: sagas and series first, then the films on their own. */
+/** The whole library: what to continue, sagas and series, then the films on their own. */
 export function Home({ library, offerIntegration, onError }: Props) {
   const [, navigate] = useLocation();
   const groups = library.entries.filter((e) => e.kind === 'group');
@@ -63,6 +63,31 @@ export function Home({ library, offerIntegration, onError }: Props) {
             Non merci
           </button>
         </aside>
+      )}
+      {library.continue.length > 0 && (
+        <section aria-labelledby="continue">
+          <h2 id="continue" className={styles.section}>
+            À suivre
+          </h2>
+          <div className={styles.grid}>
+            {library.continue.map((id) => {
+              const video = library.videos[id];
+              if (!video) return null;
+              const { title, detail } = continueLabel(library, video);
+              return (
+                <Poster
+                  key={id}
+                  id={id}
+                  title={title}
+                  detail={detail}
+                  image={video.thumb}
+                  progress={ratioOf(video)}
+                  onActivate={() => void start(id)}
+                />
+              );
+            })}
+          </div>
+        </section>
       )}
       {groups.length > 0 && (
         <section aria-labelledby="sagas">

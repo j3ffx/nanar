@@ -32,6 +32,31 @@
   text-decoration: none;
 }
 
+.subheading {
+  margin: 6px 0 -4px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 750;
+}
+
+/* "À suivre": one row, swiped sideways. */
+.shelf {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 132px;
+  gap: 12px;
+  margin: 0 -18px;
+  padding: 0 18px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 18px;
+  scrollbar-width: none;
+}
+
+.shelf > * {
+  scroll-snap-align: start;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

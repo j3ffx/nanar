@@ -186,6 +186,14 @@ def test_resumes_where_a_video_was_left(
     assert sessions.last.start.start == 0.0  # "from the start" overrides
 
 
+def test_the_library_says_what_to_continue(
+    controller: Controller, library: Library, progress: Progress
+) -> None:
+    assert controller.library_json()["continue"] == []
+    progress.save("/films", "Seul 2001.mkv", 600.0, 6000.0, finished=False)
+    assert controller.library_json()["continue"] == [video_id(library, "Seul")]
+
+
 def test_saves_where_a_video_is_while_it_plays_and_when_it_stops(
     controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
 ) -> None:
