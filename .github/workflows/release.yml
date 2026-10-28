@@ -64,6 +64,21 @@ jobs:
           cat "$NANAR_DATA_DIR/nanar.log" || true
           exit 1
 
+      # A plain start can't tell whether the window would open (the server answers first), and
+      # files unzipped from a download carry a mark that .NET refuses: check both, as received.
+      - name: The build loads its window and libmpv, unzipped from a download
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'download'
+          Expand-Archive -Path (Get-Item dist/nanar-*-windows.zip) -DestinationPath $out
+          # Every file but the executable (marked, it would make Windows ask before running it).
+          Get-ChildItem -Recurse -File $out | Where-Object Name -ne 'Nanar.exe' |
+            ForEach-Object { Set-Content -Path $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
+          $env:NANAR_DATA_DIR = Join-Path $env:RUNNER_TEMP 'self-check'
+          $run = Start-Process -FilePath (Join-Path $out 'Nanar/Nanar.exe') -ArgumentList '--self-check' -Wait -PassThru
+          Get-Content (Join-Path $env:NANAR_DATA_DIR 'nanar.log') -ErrorAction SilentlyContinue
+          if ($run.ExitCode -ne 0) { Write-Error "Nanar.exe --self-check failed ($($run.ExitCode))"; exit 1 }
+
       - name: Python package
         run: uv build
 
