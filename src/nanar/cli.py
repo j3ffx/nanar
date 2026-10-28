@@ -4,6 +4,7 @@ Without any folder yet, the TV page asks for one. When Nanar is already open, a 
 (a right click on a folder → "Ouvrir avec Nanar") hands its folder to it and stops.
 """
 
+import importlib
 import json
 import os
 import socket
@@ -52,10 +53,16 @@ def open_folder(
         bool, typer.Option(help="La page vient du serveur Vite (npm run dev).", hidden=True)
     ] = False,
     version: Annotated[bool, typer.Option("--version", help="Affiche la version.")] = False,
+    self_check: Annotated[
+        bool, typer.Option(help="Charge la fenêtre et libmpv, puis s'arrête.", hidden=True)
+    ] = False,
 ) -> None:
     """Nanar : tes films sur la télé, la télécommande dans le téléphone."""
     if version:
         print(f"Nanar {__version__}")
+        return
+    if self_check:
+        check_parts()
         return
     if port_taken(port):
         hand_over(port, folder)
@@ -220,6 +227,18 @@ def offers_integration(settings: Settings) -> bool:
     return not settings.integration_answered
 
 
+def check_parts() -> None:
+    """For the release: the window's toolkit (.NET on Windows) and libmpv load, as they would
+    when the window opens. A plain start can't tell: the server answers before the window."""
+    from nanar.player import _load_mpv
+
+    if sys.platform == "win32":
+        # Loads .NET through pythonnet: what fails on DLLs marked as downloaded.
+        importlib.import_module("webview.platforms.winforms")
+    _load_mpv().MPV(vo="null", ao="null").terminate()
+    print(f"Nanar {__version__}: window toolkit and libmpv load")
+
+
 def port_taken(port: int) -> bool:
     """Whether something (often another Nanar) already answers on the port. Asking beats trying
     to bind it: on Windows a second bind may succeed and the server fail later, out of sight."""
@@ -263,6 +282,12 @@ def main() -> None:
     if sys.platform == "win32":
         from nanar.desktop import win32
 
+        if getattr(sys, "frozen", False):
+            # Unzipped from a download, the DLLs carry the Internet's mark, and .NET then
+            # refuses them: unmark them before the window needs them.
+            unmarked = win32.unblock_bundle(Path(getattr(sys, "_MEIPASS", ".")))
+            if unmarked:
+                print(f"{unmarked} DLL(s) unmarked as downloaded")
         win32.declare_dpi_aware()
         win32.declare_app_id()
     cli()

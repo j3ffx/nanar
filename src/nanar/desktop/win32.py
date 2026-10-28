@@ -5,6 +5,7 @@ DPI-aware: WebView2 and mpv both declare it).
 """
 
 import ctypes
+import os
 import sys
 from ctypes import wintypes
 from pathlib import Path
@@ -97,6 +98,25 @@ def declare_dpi_aware() -> None:
 
 
 ICON = Path(__file__).resolve().parent.parent / "assets" / "nanar.ico"
+
+
+def unblock_bundle(folder: Path) -> int:
+    """Removes the "downloaded from the Internet" mark from the DLLs shipped with Nanar.
+
+    Unzipping a downloaded zip marks every file it holds (Mark of the Web, an alternate data
+    stream named Zone.Identifier). .NET then refuses to load a marked assembly, and the window,
+    which goes through .NET (pythonnet, WebView2), fails to open. These DLLs came with the
+    executable the user chose to run: unmarking them is what Properties → Unblock does on the
+    zip. Says how many were unmarked.
+    """
+    unmarked = 0
+    for dll in folder.rglob("*.dll"):
+        try:
+            os.remove(f"{dll}:Zone.Identifier")
+            unmarked += 1
+        except OSError:  # not marked (the usual case), or a read-only folder
+            pass
+    return unmarked
 
 
 def declare_app_id() -> None:
