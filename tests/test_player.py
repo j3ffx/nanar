@@ -93,3 +93,17 @@ def test_reports_the_end_and_plays_the_next_video_in_the_same_window() -> None:
         assert recorder.at_end.wait(15)
     finally:
         session.close()
+
+
+def test_the_demo_jumps_forward_and_back() -> None:
+    recorder = Recorder()
+    start = Start(demo.source(3, 60), "Démo", length=60.0)
+    session = MpvSession(start, Settings(), recorder)
+    try:
+        recorder.wait(lambda p: p.position > 0.2)
+        session.command("seek_to", 20)
+        recorder.wait(lambda p: p.position >= 19.5)
+        session.command("seek", -10)
+        recorder.wait(lambda p: 9 <= p.position < 15)
+    finally:
+        session.close()

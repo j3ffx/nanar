@@ -35,7 +35,8 @@ SECONDS = 300  # each made-up video lasts five minutes
 def source(index: int, seconds: int = SECONDS) -> str:
     """A video mpv generates (test pattern and a tone), with a French and an English track."""
     hue = _HUES[index % len(_HUES)]
-    video = f"testsrc2=size=1280x720:rate=25:duration={seconds},hue=h={hue}"
+    # Small: its raw pictures fill the cache that lets the player jump back (player.py).
+    video = f"testsrc2=size=640x360:rate=25:duration={seconds},hue=h={hue}"
     tone = 220 + 55 * (index % 5)
     return (
         f"av://lavfi:{video}[out0];"

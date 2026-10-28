@@ -216,6 +216,10 @@ class MpvSession:
             "stop_screensaver": "yes",
             "start": f"{start.start:.3f}",
         }
+        if start.length is not None:
+            # A generated stream (the demo's) can't seek: mpv's cache can, about half a minute
+            # back, and forward by generating faster.
+            options |= {"cache": "yes", "force_seekable": "yes", "demuxer_max_back_bytes": "300MiB"}
         if start.rect is not None:
             r = start.rect
             options["geometry"] = f"{r.width}x{r.height}+{r.x}+{r.y}"
