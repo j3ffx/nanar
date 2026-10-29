@@ -20,6 +20,7 @@ class TvWindow:
 
         self._webview = webview
         self._fullscreen = fullscreen
+        self._hidden = False  # while mpv plays over it
         self._lock = threading.Lock()
         window = webview.create_window(
             "Nanar",
@@ -57,9 +58,11 @@ class TvWindow:
         return None
 
     def hide(self) -> None:
+        self._hidden = True
         self.window.hide()
 
     def show(self, rect: Rect | None, fullscreen: bool) -> None:
+        self._hidden = False
         self.set_fullscreen(fullscreen)
         if sys.platform == "win32" and (hwnd := self._hwnd()) is not None:
             from nanar.desktop import win32
@@ -76,6 +79,8 @@ class TvWindow:
             if fullscreen != self._fullscreen:
                 self._fullscreen = fullscreen
                 self.window.toggle_fullscreen()
+        if fullscreen and not self._hidden:
+            self.bring_to_front()  # asked from the phone: the taskbar stays over it otherwise
 
     # The desktop -------------------------------------------------------------------------------
 

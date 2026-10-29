@@ -282,6 +282,8 @@ class MpvSession:
                 message = "Son coupé" if m.mute else "Son rétabli"
             case "fullscreen":
                 m.fullscreen = bool(value) if value is not None else not m.fullscreen
+                if m.fullscreen:
+                    self._to_front()
             case "audio":
                 m.aid = int(value) if value is not None else "no"
                 message = f"Audio : {self._selected('audio') or 'aucun'}"
@@ -328,6 +330,15 @@ class MpvSession:
         target = self._start.rect
         if target is not None and not self._start.fullscreen:
             win32.place_window(hwnd, target)
+        win32.bring_to_front(hwnd)  # started from the phone, it would open behind the others
+
+    def _to_front(self) -> None:
+        if sys.platform != "win32":
+            return
+        from nanar.desktop import win32
+
+        if (hwnd := win32.find_window(os.getpid(), "mpv")) is not None:
+            win32.bring_to_front(hwnd)
 
     def close(self) -> None:
         """Closes mpv. The controller asked for it: `ended` is not called."""

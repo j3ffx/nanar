@@ -15,6 +15,7 @@ from nanar.player import Rect
 assert sys.platform == "win32"  # also tells mypy to check this module for Windows only
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 _EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 user32.EnumWindows.argtypes = [_EnumWindowsProc, wintypes.LPARAM]
@@ -24,6 +25,10 @@ user32.IsWindowVisible.argtypes = [wintypes.HWND]
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 user32.IsZoomed.argtypes = [wintypes.HWND]
 user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.BringWindowToTop.argtypes = [wintypes.HWND]
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+kernel32.GetCurrentThreadId.restype = wintypes.DWORD
 user32.SetWindowPos.argtypes = [
     wintypes.HWND,
     wintypes.HWND,
@@ -140,7 +145,24 @@ def place_window(hwnd: int, rect: Rect) -> None:
 
 
 def bring_to_front(hwnd: int) -> None:
-    user32.SetForegroundWindow(hwnd)
+    """Puts a window in front, with the keyboard. Windows lets only the program the user last
+    touched do that, and a command from the phone is no touch: this thread borrows the input of
+    the window in front for the time of the call. In front matters for full screen too: the
+    taskbar stays over a full-screen window that is not."""
+    front = user32.GetForegroundWindow()
+    if front == hwnd:
+        return
+    theirs = user32.GetWindowThreadProcessId(front, None) if front else 0
+    ours = kernel32.GetCurrentThreadId()
+    attached = (
+        bool(theirs) and theirs != ours and bool(user32.AttachThreadInput(ours, theirs, True))
+    )
+    try:
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+    finally:
+        if attached:
+            user32.AttachThreadInput(ours, theirs, False)
 
 
 def restore(hwnd: int) -> None:
