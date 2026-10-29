@@ -5,7 +5,7 @@ import { useLibrary, useLive } from '@/lib/api';
 import { Controls, type Tab } from './Controls';
 import { Library } from './Library';
 import styles from './Remote.module.css';
-import { usePairing, type Hop } from './usePairing';
+import { useAddressFallback, usePairing, type Hop } from './usePairing';
 
 /** The phone's page: pairing first, then the remote. */
 export function Remote() {
@@ -45,6 +45,7 @@ export function Remote() {
 
 function Paired({ hop, onUnpaired }: { hop: Hop; onUnpaired: () => void }) {
   const { state, connected } = useLive();
+  useAddressFallback(connected);
   const library = useLibrary(state?.libraryVersion);
   const [location, navigate] = useLocation();
   const tab: Tab = location.startsWith('/bibliotheque') ? 'library' : 'remote';

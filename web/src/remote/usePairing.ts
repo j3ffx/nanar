@@ -125,3 +125,55 @@ async function moveToName(alive: () => boolean, setHop: (hop: Hop) => void): Pro
   }
   if (alive()) setHop({ state: 'unreachable', why, url });
 }
+
+const ADDRESSES = 'nanar.addresses'; // localStorage: the PC's addresses, last seen
+const FALLBACK_MS = 6000; // disconnected this long on nanar.local: try the addresses
+
+/**
+ * On nanar.local, keeps the PC's IP addresses, and moves back to the first that answers when
+ * the name stops answering (a Wi-Fi that dropped and came back can leave it unheard for
+ * minutes). The phone is paired there too: the QR code opened the page there first. Once the
+ * name answers again, the page moves back to it on its own (`moveToName`).
+ */
+export function useAddressFallback(connected: boolean): void {
+  useEffect(() => {
+    if (!connected || location.hostname !== NAME) return;
+    fetchPairing()
+      .then((pairing) => {
+        try {
+          if (pairing.addresses.length)
+            localStorage.setItem(ADDRESSES, JSON.stringify(pairing.addresses));
+        } catch {
+          // no storage (a private window): no fallback, nothing else lost
+        }
+      })
+      .catch(() => {});
+  }, [connected]);
+
+  useEffect(() => {
+    if (connected || location.hostname !== NAME) return;
+    let addresses: string[] = [];
+    try {
+      addresses = JSON.parse(localStorage.getItem(ADDRESSES) ?? '[]') as string[];
+    } catch {
+      return;
+    }
+    if (!addresses.length) return;
+    let alive = true;
+    void (async () => {
+      while (alive) {
+        await new Promise((resolve) => setTimeout(resolve, FALLBACK_MS));
+        for (const address of addresses) {
+          if (!alive) return;
+          if ((await probe(address)) === 'ok' && alive) {
+            location.replace(`http://${address}${location.pathname}`);
+            return;
+          }
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [connected]);
+}
