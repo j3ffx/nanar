@@ -4,6 +4,17 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.2.1 — 2026-10-29
+
+### Corrections
+
+- Le plein écran demandé depuis le téléphone recouvre enfin la barre des tâches, même quand Nanar
+  n’était pas la fenêtre active ; un film lancé depuis le téléphone s’ouvre aussi au premier plan.
+- La télécommande ne décroche plus pour de bon quand le Wi-Fi du PC se coupe et revient (un Wi-Fi
+  d’hôtel, par exemple) : Nanar vérifie que `nanar.local` répond encore et se réannonce sinon, et
+  la télécommande repasse en attendant par l’adresse IP du PC. Garde la page ouverte : la
+  recharger pendant la coupure affiche « site inaccessible ».
+
 ## 0.2.0 — 2026-10-28
 
 Le canapé : choisir quoi regarder sans se lever.
