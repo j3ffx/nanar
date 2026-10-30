@@ -9,6 +9,7 @@ from starlette.websockets import WebSocketDisconnect
 from nanar.app import Network, create_app
 from nanar.config import Settings
 from nanar.controller import Controller
+from nanar.hotspot import HotspotError, Status
 from nanar.library import build
 from nanar.previews import Previews
 
@@ -345,3 +346,72 @@ def test_marks_a_video_from_a_phone(client: TestClient) -> None:
     assert client.get("/api/library").json()["videos"][film]["progress"]["watched"]
     bad = client.post("/api/mark", json={"videoId": film, "action": "burn"})
     assert bad.status_code == 422
+
+
+class FakeHotspot:
+    def __init__(self) -> None:
+        self.last = Status(available=True, ssid="Nanar", passphrase="secret12")
+
+    def status(self) -> Status:
+        return self.last
+
+    def turn(self, on: bool) -> Status:
+        if not self.last.available:
+            raise HotspotError("no_internet")
+        self.last = Status(available=True, on=on, ssid="Nanar", passphrase="secret12")
+        return self.last
+
+    def close(self) -> None:
+        pass
+
+
+def test_only_this_machine_opens_the_hotspot_and_sees_its_password(
+    controller: Controller,
+) -> None:
+    wifi = FakeHotspot()
+    network = Network(port=8642, addresses=lambda: ["192.168.1.10"])
+    app = create_app(controller, key=KEY, network=network, hotspot=wifi)  # type: ignore[arg-type]
+    tv = TestClient(app, base_url="http://127.0.0.1:8642", client=TV)
+    phone = TestClient(app, base_url="http://192.168.1.10:8642", client=PHONE)
+    pair(phone)
+    assert tv.get("/api/hotspot/qr.svg").status_code == 404  # closed
+    assert phone.post("/api/hotspot", json={"on": True}).status_code == 403
+    assert tv.post("/api/hotspot", json={"on": True}).status_code == 204
+    assert controller.state()["hotspot"] == {"available": True, "on": True, "ssid": "Nanar"}
+    assert tv.get("/api/hotspot/qr.svg").headers["content-type"] == "image/svg+xml"
+    assert phone.get("/api/hotspot/qr.svg").status_code == 404
+    assert "secret12" not in phone.get("/api/state").text
+    wifi.last = Status(available=False)
+    refused = tv.post("/api/hotspot", json={"on": True})
+    assert refused.status_code == 409
+    assert refused.json() == {"code": "no_internet"}
+
+
+def test_online_keys_are_set_from_this_machine_only_and_never_shown(
+    client: TestClient, phone: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from nanar.online import Tmdb
+
+    monkeypatch.setattr(Tmdb, "check", lambda self: None)  # no network in tests
+    pair(phone)
+    assert phone.post("/api/online", json={"tmdb": "abcdef123456"}).status_code == 403
+    assert phone.get("/api/online").status_code == 403
+    assert client.post("/api/online", json={"tmdb": "abcdef123456"}).status_code == 204
+    shown = client.get("/api/online").json()
+    assert shown["tmdb"]["set"]
+    assert shown["tmdb"]["hint"] == "…3456"
+    assert "abcdef123456" not in client.get("/api/online").text
+    assert client.post("/api/online", json={"tmdb": ""}).status_code == 204
+    assert not client.get("/api/online").json()["tmdb"]["set"]
+
+
+def test_a_refused_key_is_not_kept(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from nanar.online import OnlineError, Tmdb
+
+    def refuse(self: Tmdb) -> None:
+        raise OnlineError("bad_key")
+
+    monkeypatch.setattr(Tmdb, "check", refuse)
+    answer = client.post("/api/online", json={"tmdb": "wrongwrong"})
+    assert answer.json() == {"code": "bad_key"}
+    assert not client.get("/api/online").json()["tmdb"]["set"]

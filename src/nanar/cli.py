@@ -4,6 +4,7 @@ Without any folder yet, the TV page asks for one. When Nanar is already open, a 
 (a right click on a folder → "Ouvrir avec Nanar") hands its folder to it and stops.
 """
 
+import contextlib
 import importlib
 import json
 import os
@@ -75,14 +76,17 @@ def open_folder(
         return
 
     from nanar import demo as demo_library
+    from nanar import hotspot
     from nanar.app import Network, create_app
     from nanar.discovery import HOST, Announcer
     from nanar.folders import Folders
     from nanar.library import Library
-    from nanar.pairing import load_key
+    from nanar.metadata import Metadata
+    from nanar.pairing import lan_addresses, load_key
     from nanar.player import MpvSession
     from nanar.previews import Previews
     from nanar.progress import Progress
+    from nanar.subtitles import Subtitles
     from nanar.thumbnails import Thumbnails
 
     settings_path = data_dir(demo=demo) / "settings.json"
@@ -92,9 +96,15 @@ def open_folder(
     # One key for the demo and the real library: a phone paired once stays paired.
     key = load_key(data_dir(), renew=new_key)
     network = Network(port=port, lan=not local)
+    wifi = hotspot.NoHotspot() if local else hotspot.make()
+    # On the PC's own Wi-Fi (mode hôtel), the QR code leads there.
+    network.addresses = lambda: hotspot.first(
+        lan_addresses(), hotspot.address() if wifi.last.on else None
+    )
     if shown := os.environ.get("NANAR_SHOW_ADDRESS"):
         # Screenshots for the README: an address reserved for documentation, nothing announced.
         network.addresses = lambda: [shown]
+        wifi = hotspot.NoHotspot()
     announcer = Announcer(port, network.addresses)
     if network.lan and not shown:
         announcer.start()
@@ -107,8 +117,14 @@ def open_folder(
     thumbnails = Thumbnails(data_dir(demo=demo) / "thumbnails", on_ready=controller.library_changed)
     controller.thumbnails = thumbnails
     controller.previews = Previews(data_dir(demo=demo) / "previews")
+    metadata = Metadata(data_dir(demo=demo) / "tmdb", on_ready=controller.library_changed)
+    metadata.configure(settings.tmdb_key)
+    controller.metadata = metadata
+    controller.subtitles = Subtitles(data_dir(demo=demo) / "subtitles")
+    controller.subtitles.configure(settings.opensubtitles_key)
     if not demo:  # the demo keeps its coloured cards: frames of test patterns show nothing
         thumbnails.schedule(library)
+    metadata.schedule(library)
     folders = Folders(controller, settings, None if demo else settings_path)
     if not demo:
         chosen = folder or (Path(settings.last_folder) if settings.last_folder else None)
@@ -119,12 +135,19 @@ def open_folder(
                 print(f"{chosen} n'est pas un dossier : choisis-en un sur la télé.")
     print(f"Nanar {__version__} : {len(controller.library.videos)} vidéo(s)")
 
+    def check_hotspot() -> None:  # a second or two (PowerShell): not in the way of the start
+        with contextlib.suppress(hotspot.HotspotError):
+            controller.set_hotspot(wifi.status().public())
+
+    threading.Thread(target=check_hotspot, name="nanar-hotspot", daemon=True).start()
+
     app_holder: list[Desktop] = []
     app = create_app(
         controller,
         key=key,
         network=network,
         desktop=_LazyDesktop(app_holder),
+        hotspot=wifi,
     )
     server = uvicorn.Server(
         uvicorn.Config(
@@ -135,8 +158,10 @@ def open_folder(
     def stop_all() -> None:
         controller.shutdown()
         thumbnails.stop()
+        metadata.stop()
         folders.stop()
         announcer.stop()
+        wifi.close()
 
     if headless:
         try:

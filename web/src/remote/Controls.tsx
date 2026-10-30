@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { ApiError, command, type Playing, type State, type Track } from '@/lib/api';
+import { ApiError, command, findSubtitles, type Playing, type State, type Track } from '@/lib/api';
 import { clock, episodeCode } from '@/lib/format';
 
 import * as Icon from './icons';
@@ -20,6 +20,11 @@ const MESSAGES: Record<string, string> = {
   nothing_playing: 'Rien ne passe en ce moment.',
   no_neighbour: 'Pas d’autre épisode de ce côté.',
   bad_value: 'Nanar n’a pas compris.',
+  no_subtitles: 'Pas de sous-titres français trouvés pour cette vidéo.',
+  quota_reached: 'OpenSubtitles refuse pour aujourd’hui : réessaie demain.',
+  bad_key: 'OpenSubtitles refuse la clé (voir les réglages sur la télé).',
+  offline: 'Le PC n’arrive pas à joindre OpenSubtitles.',
+  online_off: 'Les sous-titres en ligne ne sont pas activés.',
 };
 
 export type Tab = 'remote' | 'library';
@@ -107,7 +112,7 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
       {tab === 'library' ? (
         library(notify)
       ) : playing ? (
-        <NowPlaying playing={playing} state={state!} send={send} />
+        <NowPlaying playing={playing} state={state!} send={send} notify={notify} />
       ) : (
         <section className={styles.idle}>
           <p className={styles.lead}>{state ? 'Rien à l’écran.' : 'Connexion à Nanar…'}</p>
@@ -161,8 +166,29 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
 
 type Send = (action: string, value?: unknown) => void;
 
-function NowPlaying({ playing, state, send }: { playing: Playing; state: State; send: Send }) {
+function NowPlaying({
+  playing,
+  state,
+  send,
+  notify,
+}: {
+  playing: Playing;
+  state: State;
+  send: Send;
+  notify: (message: string) => void;
+}) {
   const [sheet, setSheet] = useState<'audio' | 'subs' | 'sleep' | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchOnline = () => {
+    setSearching(true);
+    findSubtitles()
+      .then(() => setSheet(null))
+      .catch((error: unknown) => {
+        const code = error instanceof ApiError ? error.code : '';
+        notify(MESSAGES[code] ?? 'Nanar ne répond pas.');
+      })
+      .finally(() => setSearching(false));
+  };
   const { video } = playing;
   const end = video.kind === 'episode' ? 'À la fin de l’épisode' : 'À la fin du film';
   const endShort = video.kind === 'episode' ? 'Fin d’épisode' : 'Fin du film';
@@ -288,6 +314,16 @@ function NowPlaying({ playing, state, send }: { playing: Playing; state: State; 
       </Sheet>
       <Sheet title="Sous-titres" open={sheet === 'subs'} onClose={() => setSheet(null)}>
         <TrackList tracks={playing.subs} onPick={(id) => send('sub', id)} none="Aucun" />
+        {state.online.subtitles && (
+          <button
+            type="button"
+            className={styles.track}
+            onClick={searchOnline}
+            disabled={searching}
+          >
+            {searching ? 'Recherche…' : 'Chercher des sous-titres français en ligne'}
+          </button>
+        )}
         <Stepper
           label="Décalage"
           value={`${playing.subDelay >= 0 ? '+' : '−'}${Math.abs(playing.subDelay).toFixed(1).replace('.', ',')} s`}

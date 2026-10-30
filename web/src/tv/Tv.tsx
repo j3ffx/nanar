@@ -9,7 +9,9 @@ import { Backdrop } from './Backdrop';
 import { GroupPage } from './GroupPage';
 import { Header } from './Header';
 import { Home } from './Home';
+import { Hotel } from './Hotel';
 import { RemoteCard } from './RemoteCard';
+import { Settings } from './Settings';
 import styles from './Tv.module.css';
 import { useIdle } from './useIdle';
 
@@ -52,6 +54,9 @@ export function Tv() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      // Typing in a field (a key, in the settings): its keys are its own, up and down aside.
+      const typing = event.target instanceof HTMLInputElement;
+      if (typing && !['ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) return;
       const direction = DIRECTIONS[event.key];
       if (direction && main.current) {
         if (moveFocus(main.current, direction)) event.preventDefault();
@@ -124,6 +129,15 @@ export function Tv() {
           <p className={styles.loading}>Les bobines arrivent…</p>
         ) : (
           <Switch>
+            <Route path="/hotel">
+              <Hotel
+                hotspot={state?.hotspot ?? { available: false, on: false, ssid: null }}
+                onBack={back}
+              />
+            </Route>
+            <Route path="/reglages">
+              <Settings onBack={back} />
+            </Route>
             <Route path="/g/:id">
               {(params) => (
                 <GroupPage library={library} groupId={params.id} onBack={back} onError={onError} />
@@ -154,7 +168,10 @@ export function Tv() {
           </span>
         )}
       </footer>
-      <RemoteCard phones={state?.phones ?? 0} />
+      <RemoteCard
+        phones={state?.phones ?? 0}
+        wifi={state?.hotspot.on ? state.hotspot.ssid : null}
+      />
       {error && (
         <p className={styles.error} role="alert">
           {error}

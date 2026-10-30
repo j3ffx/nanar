@@ -301,6 +301,14 @@
   background: var(--bg);
 }
 
+.overview {
+  margin: 0;
+  max-height: 9.5em;
+  overflow-y: auto;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
 .marks {
   display: flex;
   flex-wrap: wrap;

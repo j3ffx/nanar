@@ -20,11 +20,14 @@ from typing import TYPE_CHECKING, Any, Protocol
 from nanar import demo
 from nanar.config import Settings
 from nanar.library import Library, Video, recent
-from nanar.player import Playback, Rect, Session, SessionFactory, Start, pick_of
-from nanar.progress import Progress, to_continue
+from nanar.online import OnlineError, OpenSubtitles, Tmdb
+from nanar.player import ONLINE_TITLE, Playback, Rect, Session, SessionFactory, Start, pick_of
+from nanar.progress import Pick, Progress, to_continue
 
 if TYPE_CHECKING:
+    from nanar.metadata import Metadata
     from nanar.previews import Previews
+    from nanar.subtitles import Subtitles
     from nanar.thumbnails import Thumbnails
 
 Listener = Callable[[dict[str, Any]], None]
@@ -106,6 +109,8 @@ class Controller:
         self.progress = progress or Progress(None)
         self.thumbnails = thumbnails
         self.previews = previews
+        self.metadata: Metadata | None = None
+        self.subtitles: Subtitles | None = None
         self._settings_path = settings_path
         self._sessions = sessions
         self._demo = demo
@@ -129,6 +134,7 @@ class Controller:
         self._sleep_at = 0.0  # when the timer stops the video (time.monotonic)
         self._sleep_timer: threading.Timer | None = None
         self._sleep_seq = 0  # tells a cancelled timer's late call from the current one
+        self._hotspot: dict[str, Any] = {"available": False, "on": False, "ssid": None}
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -189,6 +195,11 @@ class Controller:
                 "upNext": up_next,
                 "night": self._night,
                 "sleep": sleep,
+                "hotspot": dict(self._hotspot),
+                "online": {
+                    "posters": bool(self.metadata and self.metadata.enabled),
+                    "subtitles": bool(self.subtitles and self.subtitles.enabled),
+                },
                 "view": dict(self._view),
                 "offerIntegration": self._offer_integration,
             }
@@ -200,8 +211,12 @@ class Controller:
             saved = self.progress.of_root(self.library.root)
             for group_id in self.library.groups:
                 data["groups"][group_id]["thumb"] = self._thumb_url("g", group_id)
+                info = self.metadata.of_group(self.library, group_id) if self.metadata else None
+                data["groups"][group_id]["overview"] = (info or {}).get("overview") or None
             for video in self.library.videos.values():
                 data["videos"][video.id]["thumb"] = self._thumb_url("v", video.id)
+                info = self.metadata.of_video(self.library, video) if self.metadata else None
+                data["videos"][video.id]["overview"] = (info or {}).get("overview") or None
                 entry = saved.get(video.path)
                 data["videos"][video.id]["progress"] = (
                     {
@@ -225,9 +240,18 @@ class Controller:
         if self.thumbnails is None:
             return None
         if kind == "g":
-            return self.thumbnails.of_group(self.library, ident)
+            return self.thumbnails.of_group(self.library, ident, self._online_poster)
         video = self.library.videos.get(ident)
-        return self.thumbnails.of_video(self.library, video) if video else None
+        return self.thumbnails.of_video(self.library, video, self._online_poster) if video else None
+
+    def _online_poster(self, kind: str, ident: str) -> Path | None:
+        """TMDb's poster, when it is asked (after the user's own, before a frame)."""
+        if self.metadata is None:
+            return None
+        if kind == "g":
+            return self.metadata.poster(self.metadata.of_group(self.library, ident))
+        video = self.library.videos.get(ident)
+        return self.metadata.poster(self.metadata.of_video(self.library, video)) if video else None
 
     def preview(self, video_id: str, at: float) -> Path | None:
         """A frame of the video playing, near `at` seconds: the phone's progress bar shows it
@@ -266,6 +290,14 @@ class Controller:
             self._offer_integration = offer
         self._announce()
 
+    def set_hotspot(self, public: dict[str, Any]) -> None:
+        """Whether the PC's own Wi-Fi is open (mode hôtel), for the TV page."""
+        with self._lock:
+            if public == self._hotspot:
+                return
+            self._hotspot = dict(public)
+        self._announce()
+
     def set_phones(self, count: int) -> None:
         """How many phones are connected (the TV page shows it)."""
         with self._lock:
@@ -281,6 +313,8 @@ class Controller:
             self._library_version += 1
         if self.thumbnails is not None:
             self.thumbnails.schedule(library)
+        if self.metadata is not None:
+            self.metadata.schedule(library)
         self._announce()
 
     def library_changed(self) -> None:
@@ -315,6 +349,19 @@ class Controller:
                 audio=picks.get("audio"),
                 sub=picks.get("sub"),
                 night=self._night,
+                sub_files=tuple(
+                    str(p)
+                    for p in (
+                        self.subtitles.saved(self.library.root, video) if self.subtitles else []
+                    )
+                ),
+            )
+            wants_online = (
+                (pick := picks.get("sub")) is not None
+                and pick.title == ONLINE_TITLE
+                and not begin.sub_files
+                and self.subtitles is not None
+                and self.subtitles.enabled
             )
             if self._session is not None:
                 # The same window: no flicker between two episodes.
@@ -330,6 +377,59 @@ class Controller:
                     _SessionCallbacks(self, self._generation),
                 )
                 self.window.hide()
+        self._announce()
+        if wants_online:  # the series plays with downloaded subtitles: this episode too
+            threading.Thread(
+                target=self._quietly_find_subtitles, args=(video.id,), daemon=True
+            ).start()
+
+    def find_subtitles(self) -> None:
+        """Downloads French subtitles for the video playing, and shows them. Raises
+        CommandError with OnlineError's codes (or "nothing_playing")."""
+        with self._lock:
+            if self._video is None or self.subtitles is None:
+                raise CommandError("nothing_playing" if self._video is None else "online_off")
+            video, root = self._video, self.library.root
+            source = None if "://" in video.path else Path(self._source_of(video))
+        try:
+            found = self.subtitles.find(root, video, source)  # out of the lock: seconds
+        except OnlineError as error:
+            raise CommandError(error.code) from error
+        with self._lock:
+            if self._video is not video or self._session is None:
+                return  # another video by now
+            self._session.command("sub_add", str(found), osd=True)
+            self.progress.pick(root, _owner(video), "sub", Pick("fr", ONLINE_TITLE))
+
+    def _quietly_find_subtitles(self, video_id: str) -> None:
+        with self._lock:
+            if self._video is None or self._video.id != video_id:
+                return
+        with contextlib.suppress(CommandError):
+            self.find_subtitles()
+
+    def set_online(self, *, tmdb: str | None = None, opensubtitles: str | None = None) -> None:
+        """New keys ("" takes one away): each is tried first. Raises CommandError("bad_key"),
+        ("offline")."""
+        try:
+            if tmdb:
+                Tmdb(tmdb).check()
+            if opensubtitles:
+                OpenSubtitles(opensubtitles).check()
+        except OnlineError as error:
+            raise CommandError(error.code) from error
+        with self._lock:
+            if tmdb is not None:
+                self.settings.tmdb_key = tmdb.strip()
+                if self.metadata is not None:
+                    self.metadata.configure(self.settings.tmdb_key)
+                    self.metadata.schedule(self.library)
+            if opensubtitles is not None:
+                self.settings.opensubtitles_key = opensubtitles.strip()
+                if self.subtitles is not None:
+                    self.subtitles.configure(self.settings.opensubtitles_key)
+            self._save_settings()
+            self._library_version += 1
         self._announce()
 
     def command(self, action: str, value: Any = None, *, osd: bool = False) -> None:

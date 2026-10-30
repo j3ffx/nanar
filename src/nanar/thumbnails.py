@@ -1,9 +1,9 @@
 """Pictures for the library: a poster found next to the video, or a frame taken from it.
 
 A poster the user put there wins: `<video name>.jpg` (or -poster, .png…), or `poster.jpg` /
-`folder.jpg` / `cover.jpg` in its folder. Otherwise libmpv takes one frame, a quarter into the
-video, scaled down to 480 pixels wide, into the data directory, one video at a time in the
-background. Nothing is ever fetched from the Internet.
+`folder.jpg` / `cover.jpg` in its folder. Then TMDb's poster, when the user gave a key
+(`metadata.py`). Otherwise libmpv takes one frame, a quarter into the video, scaled down to 480
+pixels wide, into the data directory, one video at a time in the background.
 """
 
 import hashlib
@@ -26,6 +26,7 @@ ANNOUNCE_EVERY = 4  # thumbnails made between two announcements to the pages
 log = logging.getLogger(__name__)
 
 Grabber = Callable[[str, Path], bool]  # source, destination → made it
+Online = Callable[[str, str], Path | None]  # "v" or "g", its id → a poster from TMDb
 
 
 class Thumbnails:
@@ -45,16 +46,21 @@ class Thumbnails:
 
     # What the pages ask for --------------------------------------------------------------------
 
-    def of_video(self, library: Library, video: Video) -> Path | None:
+    def of_video(self, library: Library, video: Video, online: Online | None = None) -> Path | None:
         """The picture of a video, if there is one yet."""
         poster = local_poster(library, video)
+        if poster is None and online is not None:
+            poster = online("v", video.id)
         if poster is not None:
             return poster
         made = self._made(library, video)
         return made if made.is_file() else None
 
-    def of_group(self, library: Library, group_id: str) -> Path | None:
-        """A saga's or a series' picture: its folder's poster, else its first video's."""
+    def of_group(
+        self, library: Library, group_id: str, online: Online | None = None
+    ) -> Path | None:
+        """A saga's or a series' picture: its folder's poster, else TMDb's, else its first
+        video's."""
         group = library.groups.get(group_id)
         if group is None:
             return None
@@ -62,7 +68,9 @@ class Thumbnails:
         folder_poster = _folder_poster(library, PurePosixPath(first.path).parent)
         if folder_poster is None and first.kind == "episode":  # Série/Saison 1/… → Série/
             folder_poster = _folder_poster(library, PurePosixPath(first.path).parent.parent)
-        return folder_poster or self.of_video(library, first)
+        if folder_poster is None and online is not None:
+            folder_poster = online("g", group_id)
+        return folder_poster or self.of_video(library, first, online)
 
     # Making them -------------------------------------------------------------------------------
 

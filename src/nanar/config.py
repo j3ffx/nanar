@@ -33,6 +33,9 @@ class Settings:
     # names release groups use). Subtitles in the language of the audio are left off.
     audio_languages: list[str] = field(default_factory=lambda: ["fr", "fre", "fra", "en", "eng"])
     subtitle_languages: list[str] = field(default_factory=lambda: ["fr", "fre", "fra"])
+    # Keys the user got from TMDb and OpenSubtitles: without one, Nanar never asks them anything.
+    tmdb_key: str = ""
+    opensubtitles_key: str = ""
 
     @classmethod
     def load(cls, path: Path) -> "Settings":

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from nanar import __version__
 from nanar.controller import CommandError, Controller
+from nanar.hotspot import HotspotError, NoHotspot, WindowsHotspot, wifi_qr
 from nanar.pairing import lan_addresses, remote_url
 from nanar.security import COOKIE, AccessMiddleware, Caller, key_matches
 
@@ -60,6 +61,17 @@ class IntegrationBody(BaseModel):
     install: bool
 
 
+class HotspotBody(BaseModel):
+    on: bool
+
+
+class OnlineBody(BaseModel):
+    """New keys for the online services: a field left out keeps its key, "" takes it away."""
+
+    tmdb: str | None = Field(default=None, max_length=400)
+    opensubtitles: str | None = Field(default=None, max_length=200)
+
+
 class Desktop(Protocol):
     """What only this machine may ask for: its folders, its window, its Start menu."""
 
@@ -89,13 +101,34 @@ class Network:
     name: Callable[[], str | None] = field(default=lambda: None)
 
 
+def _hint(key: str) -> str | None:
+    """Enough of a key to recognise it: its last four characters."""
+    return f"…{key[-4:]}" if len(key) >= 8 else None
+
+
+def _svg(text: str) -> Response:
+    qr = segno.make(text, error="m")
+    # A whole SVG document (with its namespace): an <img> shows nothing without it.
+    out = io.BytesIO()
+    qr.save(out, kind="svg", scale=8, border=2, dark="#120d1a", light="#f6efe4")
+    return Response(
+        out.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"}
+    )
+
+
 def static_dir() -> Path:
     return Path(str(files("nanar"))) / "web" / "static"
 
 
 def create_app(
-    controller: Controller, *, key: str, network: Network, desktop: Desktop | None = None
+    controller: Controller,
+    *,
+    key: str,
+    network: Network,
+    desktop: Desktop | None = None,
+    hotspot: WindowsHotspot | NoHotspot | None = None,
 ) -> FastAPI:
+    wifi = hotspot or NoHotspot()
     app = FastAPI(title="Nanar", version=__version__, docs_url=None, redoc_url=None)
     app.add_middleware(AccessMiddleware, key=key)
     phones: set[WebSocket] = set()
@@ -182,6 +215,64 @@ def create_app(
         controller.set_integration_offer(False)
         return None
 
+    @app.post("/api/hotspot", status_code=204, response_model=None)
+    async def turn_hotspot(body: HotspotBody, request: Request) -> JSONResponse | None:
+        """Mode hôtel: opens (or closes) the PC's own Wi-Fi. Asked on the TV page only: it
+        changes how this machine is connected."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        try:
+            status = await asyncio.to_thread(wifi.turn, body.on)
+        except HotspotError as error:
+            controller.set_hotspot(wifi.last.public())
+            raise CommandError(error.code) from error
+        controller.set_hotspot(status.public())
+        return None
+
+    @app.get("/api/hotspot/qr.svg", response_model=None)
+    async def hotspot_qr(request: Request) -> Response:
+        """The QR code that joins the PC's Wi-Fi: it holds the password, for this machine's
+        page only."""
+        status = wifi.last
+        if not _caller(request).local or not (status.on and status.ssid and status.passphrase):
+            return JSONResponse({"code": "no_hotspot"}, status_code=404)
+        return _svg(wifi_qr(status.ssid, status.passphrase))
+
+    @app.post("/api/subtitles", status_code=204)
+    async def subtitles() -> None:
+        """French subtitles from OpenSubtitles for the video playing (when it has a key)."""
+        await asyncio.to_thread(controller.find_subtitles)
+
+    @app.get("/api/online", response_model=None)
+    async def online(request: Request) -> dict[str, Any] | JSONResponse:
+        """For the settings page, on this machine: which keys are set (never the keys)."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        settings = controller.settings
+        metadata = controller.metadata
+        return {
+            "tmdb": {
+                "set": bool(settings.tmdb_key),
+                "hint": _hint(settings.tmdb_key),
+                "error": metadata.error if metadata else None,
+            },
+            "opensubtitles": {
+                "set": bool(settings.opensubtitles_key),
+                "hint": _hint(settings.opensubtitles_key),
+            },
+        }
+
+    @app.post("/api/online", status_code=204, response_model=None)
+    async def set_online(body: OnlineBody, request: Request) -> JSONResponse | None:
+        """Turns the online services on (a key) or off: only from this machine, as it makes
+        Nanar talk to the Internet."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        await asyncio.to_thread(
+            controller.set_online, tmdb=body.tmdb, opensubtitles=body.opensubtitles
+        )
+        return None
+
     @app.post("/api/pair", response_model=None)
     async def pair(body: PairBody) -> Response:
         if not key_matches(body.key, key):
@@ -209,13 +300,7 @@ def create_app(
         addresses = network.addresses() if network.lan else []
         if not addresses:
             return JSONResponse({"code": "no_network"}, status_code=404)
-        qr = segno.make(remote_url(addresses[0], network.port, key), error="m")
-        # A whole SVG document (with its namespace): an <img> shows nothing without it.
-        out = io.BytesIO()
-        qr.save(out, kind="svg", scale=8, border=2, dark="#120d1a", light="#f6efe4")
-        return Response(
-            out.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"}
-        )
+        return _svg(remote_url(addresses[0], network.port, key))
 
     @app.websocket("/api/live")
     async def live(socket: WebSocket) -> None:

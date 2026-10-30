@@ -181,6 +181,12 @@ export function Home({ library, filter, onBack, offerIntegration, onError }: Pro
         <button type="button" data-nav onClick={() => void choose()}>
           Changer de dossier
         </button>
+        <button type="button" data-nav onClick={() => navigate('/hotel')}>
+          Mode hôtel
+        </button>
+        <button type="button" data-nav onClick={() => navigate('/reglages')}>
+          Réglages
+        </button>
       </p>
     </>
   );

@@ -429,3 +429,38 @@ def test_phones_mark_videos_and_clear_continue(
     assert controller.library_json()["videos"][seul]["progress"] is None
     with pytest.raises(CommandError, match="unknown_video"):
         controller.mark("nope", "watched")
+
+
+class FakeSubtitles:
+    enabled = True
+
+    def __init__(self, folder: Path) -> None:
+        self.folder = folder
+        self.found: list[str] = []
+
+    def saved(self, root: str, video: Any) -> list[Path]:
+        path = self.folder / f"{video.id}.srt"
+        return [path] if path.exists() else []
+
+    def find(self, root: str, video: Any, source: Path | None) -> Path:
+        self.found.append(video.title)
+        path = self.folder / f"{video.id}.srt"
+        path.write_text("srt")
+        return path
+
+
+def test_subtitles_found_online_play_now_and_with_the_next_episodes(
+    controller: Controller, library: Library, sessions: FakeSessions, tmp_path: Path
+) -> None:
+    subtitles = FakeSubtitles(tmp_path)
+    controller.subtitles = subtitles  # type: ignore[assignment]
+    controller.play(video_id(library, "Saga"))
+    controller.find_subtitles()
+    action, path = sessions.last.commands[-1]
+    assert action == "sub_add"
+    assert path.endswith(".srt")
+    controller.play(video_id(library, "Saga"))  # downloaded before: given to mpv at once
+    assert sessions.last.loaded[-1].sub_files == (path,)
+    controller.command("next")  # picked for the saga: found for this one too, in the background
+    wait_for(lambda: subtitles.found == ["Saga", "Saga 2"])
+    wait_for(lambda: sessions.last.commands[-1][0] == "sub_add")

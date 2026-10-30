@@ -318,3 +318,106 @@
   font-weight: 700;
   font-size: 1.2rem;
 }
+
+/* Mode hôtel and the settings: pages of text and a few controls. */
+.page {
+  max-width: 1100px;
+  padding-bottom: 32px;
+}
+
+.lead {
+  max-width: 70ch;
+  margin: 0 0 24px;
+  color: var(--text-muted);
+  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  line-height: 1.5;
+}
+
+.note {
+  max-width: 70ch;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: clamp(0.9rem, 1.05vw, 1.1rem);
+}
+
+.action {
+  padding: 12px 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action:disabled,
+.backButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.action:focus {
+  outline: 4px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  gap: 12px;
+  max-width: 300px;
+  font-size: clamp(1rem, 1.2vw, 1.2rem);
+}
+
+.step p {
+  margin: 0;
+}
+
+.stepQr {
+  width: clamp(180px, 16vw, 260px);
+  height: auto;
+  border-radius: 14px;
+}
+
+.setting {
+  margin: 0 0 32px;
+}
+
+.settingTitle {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 1.6vw, 1.6rem);
+  font-weight: 750;
+}
+
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.input {
+  flex: 1 1 320px;
+  min-width: 0;
+  padding: 12px 18px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 14px;
+  background: var(--bg-sunk);
+  color: var(--text);
+  font: inherit;
+  font-size: clamp(1rem, 1.2vw, 1.2rem);
+}
+
+.input:focus {
+  outline: 4px solid var(--focus);
+  outline-offset: 2px;
+}

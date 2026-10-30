@@ -7,7 +7,7 @@ import styles from './RemoteCard.module.css';
 const REFRESH_MS = 30_000; // the PC may change networks (a hotel, a phone's hotspot)
 
 /** The QR code that turns a phone into the remote, and how many phones already are. */
-export function RemoteCard({ phones }: { phones: number }) {
+export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | null }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
 
   useEffect(() => {
@@ -58,6 +58,7 @@ export function RemoteCard({ phones }: { phones: number }) {
         <p className={styles.text}>
           {phones > 0 ? 'Un autre ? Scanne le code.' : 'Scanne ce code avec son appareil photo.'}
         </p>
+        {wifi && <p className={styles.text}>Sur le Wi-Fi « {wifi} » (mode hôtel).</p>}
         <p className={styles.address}>
           {main}
           {others.length > 0 && <span className={styles.others}> · ou {others.join(' · ')}</span>}

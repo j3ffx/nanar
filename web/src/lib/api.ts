@@ -16,6 +16,8 @@ export interface Video {
   /** Where it was left, and its picture (given with the library, not in the live state). */
   progress?: Progress | null;
   thumb?: string | null;
+  /** TMDb's summary, when the user gave Nanar a key (films only). */
+  overview?: string | null;
 }
 
 export interface Progress {
@@ -35,6 +37,8 @@ export interface Group {
   title: string;
   videos: string[];
   thumb?: string | null;
+  /** TMDb's summary of a series, when the user gave Nanar a key. */
+  overview?: string | null;
 }
 
 export interface Library {
@@ -87,6 +91,10 @@ export interface State {
   night: boolean;
   /** Stops at the end of this video, or in `remaining` seconds. */
   sleep: { kind: 'end' } | { kind: 'timer'; remaining: number } | null;
+  /** Mode hôtel: the PC's own Wi-Fi, which phones join to reach Nanar. */
+  hotspot: { available: boolean; on: boolean; ssid: string | null };
+  /** Which online services have a key (off by default). */
+  online: { posters: boolean; subtitles: boolean };
   /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
   view: { path: string; focus: string | null; filter: Filter; seq: number };
   /** The Windows build asks once to add Nanar to the Start menu and the right-click menu. */
@@ -129,6 +137,28 @@ export const command = (action: string, value?: unknown) =>
 /** Marks a video watched or not, or takes it out of "À suivre". */
 export const mark = (videoId: string, action: 'watched' | 'unwatched' | 'dismiss') =>
   send('/api/mark', { videoId, action });
+
+/** French subtitles from OpenSubtitles for the video playing. */
+export const findSubtitles = () => send('/api/subtitles', {});
+
+/** This machine only: opens or closes the PC's own Wi-Fi (mode hôtel). */
+export const turnHotspot = (on: boolean) => send('/api/hotspot', { on });
+
+export interface OnlineSettings {
+  tmdb: { set: boolean; hint: string | null; error: string | null };
+  opensubtitles: { set: boolean; hint: string | null };
+}
+
+/** This machine only: which online services have a key. */
+export async function fetchOnline(): Promise<OnlineSettings> {
+  const response = await fetch('/api/online');
+  if (!response.ok) throw new ApiError(`http_${response.status}`);
+  return (await response.json()) as OnlineSettings;
+}
+
+/** This machine only: a new key ("" takes it away), tried before it is kept. */
+export const setOnline = (keys: { tmdb?: string; opensubtitles?: string }) =>
+  send('/api/online', keys);
 
 export const pair = (key: string) => send('/api/pair', { key });
 

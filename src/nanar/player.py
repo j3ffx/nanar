@@ -15,6 +15,8 @@ from typing import Any, ClassVar, Protocol
 from nanar.config import Settings
 from nanar.progress import Pick
 
+ONLINE_TITLE = "OpenSubtitles"  # the title of the subtitles Nanar downloaded
+
 # Night mode: loud scenes brought down and quiet lines up, for late evenings and thin walls.
 NIGHT_FILTER = "lavfi=[dynaudnorm=f=250:g=15:p=0.6:m=8]"
 
@@ -112,6 +114,7 @@ class Start:
     audio: Pick | None = None
     sub: Pick | None = None
     night: bool = False
+    sub_files: tuple[str, ...] = ()  # subtitles downloaded for this video before
 
 
 class Callbacks(Protocol):
@@ -342,6 +345,9 @@ class MpvSession:
             case "sub_scale":
                 m.sub_scale = max(0.3, min(3.0, float(value)))
                 message = f"Taille des sous-titres : {round(m.sub_scale * 100)} %"
+            case "sub_add":
+                m.command("sub-add", str(value), "select", ONLINE_TITLE, "fr")
+                message = f"Sous-titres : {ONLINE_TITLE}"
             case "night":
                 on = bool(value) if value is not None else not self._playback.night
                 m.af = NIGHT_FILTER if on else ""
@@ -460,9 +466,16 @@ class MpvSession:
         self._callbacks.changed(p)
 
     def _apply_picks(self, p: Playback) -> None:
-        """Selects the tracks picked by hand in another video of the saga or series."""
+        """Adds the subtitles downloaded before, and selects the tracks picked by hand in
+        another video of the saga or series."""
+        subs = p.subs
+        if self._start.sub_files:
+            for path in self._start.sub_files:
+                self._mpv.command("sub-add", path, "auto", ONLINE_TITLE, "fr")
+            fresh = self._mpv.track_list or []
+            subs = [_track(t) for t in fresh if t.get("type") == "sub"]
         audio = choose(p.audio, self._start.audio)
-        sub = choose(p.subs, self._start.sub)
+        sub = choose(subs, self._start.sub)
         if audio is not None:
             self._mpv["aid"] = audio
         if sub is not None:

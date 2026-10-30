@@ -37,6 +37,7 @@ export function GroupPage({ library, groupId, onBack, onError }: Props) {
         {group.title}
         <span className={styles.groupCount}>{countLabel(group)}</span>
       </h2>
+      {group.overview && <p className={styles.lead}>{group.overview}</p>}
       <ol className={styles.list}>
         {group.videos.map((id, index) => {
           const video = library.videos[id]!;

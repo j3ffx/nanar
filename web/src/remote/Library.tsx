@@ -270,6 +270,7 @@ function Picked({
           .filter(Boolean)
           .join(' · ')}
       </p>
+      {video.overview && <p className={styles.overview}>{video.overview}</p>}
       {resume ? (
         <>
           <button type="button" className={styles.primary} onClick={() => onStart(video)}>
