@@ -5,6 +5,7 @@ import { filterEntries, filterLabel, isFiltered, type Filter } from '@/lib/filte
 import { countLabel } from '@/lib/format';
 import { continueLabel, groupWatched, ratioOf } from '@/lib/progress';
 
+import { BackButton } from './BackButton';
 import { Poster } from './Poster';
 import styles from './Tv.module.css';
 
@@ -12,13 +13,15 @@ interface Props {
   library: Library;
   /** What a phone searches: the TV shows the same results. */
   filter: Filter;
+  /** Leaves the search results. */
+  onBack: () => void;
   /** The Windows build's first run: offer the Start menu and the right-click menu. */
   offerIntegration: boolean;
   onError: (message: string) => void;
 }
 
 /** The whole library: what to continue, sagas and series, then the films on their own. */
-export function Home({ library, filter, offerIntegration, onError }: Props) {
+export function Home({ library, filter, onBack, offerIntegration, onError }: Props) {
   const [, navigate] = useLocation();
   const groups = library.entries.filter((e) => e.kind === 'group');
   const films = library.entries.filter((e) => e.kind === 'video');
@@ -87,6 +90,7 @@ export function Home({ library, filter, offerIntegration, onError }: Props) {
     const found = filterEntries(library, filter);
     return (
       <section aria-labelledby="results">
+        <BackButton onBack={onBack} />
         <h2 id="results" className={styles.section}>
           Recherche : {filterLabel(filter)}
         </h2>

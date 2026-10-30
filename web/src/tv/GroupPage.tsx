@@ -5,16 +5,18 @@ import { play, type Library } from '@/lib/api';
 import { countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
 import { ratioOf, resumeLabel } from '@/lib/progress';
 
+import { BackButton } from './BackButton';
 import styles from './Tv.module.css';
 
 interface Props {
   library: Library;
   groupId: string;
+  onBack: () => void;
   onError: (message: string) => void;
 }
 
 /** A saga or a series, in order: one line per film or episode. */
-export function GroupPage({ library, groupId, onError }: Props) {
+export function GroupPage({ library, groupId, onBack, onError }: Props) {
   const group = library.groups[groupId];
   if (!group) {
     return (
@@ -30,6 +32,7 @@ export function GroupPage({ library, groupId, onError }: Props) {
 
   return (
     <section aria-labelledby="group-title">
+      <BackButton onBack={onBack} />
       <h2 id="group-title" className={styles.groupTitle}>
         {group.title}
         <span className={styles.groupCount}>{countLabel(group)}</span>

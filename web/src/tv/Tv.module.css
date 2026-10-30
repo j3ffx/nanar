@@ -88,6 +88,33 @@
   text-decoration: none;
 }
 
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 10px 22px;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 999px;
+  background: rgb(29 21 40 / 0.78);
+  color: var(--text);
+  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.backButton:hover,
+.backButton:focus {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.backButton:focus {
+  outline: 4px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .groupTitle {
   display: flex;
   align-items: baseline;

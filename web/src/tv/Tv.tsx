@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 
 import { command, useLibrary, useLive } from '@/lib/api';
@@ -19,9 +19,14 @@ function findItem(root: HTMLElement | null, id: string | null): HTMLElement | nu
   return id ? (root?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`) ?? null) : null;
 }
 
+/** The first card of the page: the back button comes before it, but isn't where one starts. */
+function firstItem(root: HTMLElement | null): HTMLElement | null {
+  return root?.querySelector<HTMLElement>('[data-nav]:not([data-back])') ?? null;
+}
+
 /** Focuses an item (or the first one), in the middle of the screen. */
 function putForward(root: HTMLElement | null, id: string | null): void {
-  const target = findItem(root, id) ?? root?.querySelector<HTMLElement>('[data-nav]');
+  const target = findItem(root, id) ?? firstItem(root);
   target?.focus();
   target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
@@ -36,6 +41,14 @@ export function Tv() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(NO_FILTER);
 
+  /** Up one level: from a saga to the library, from search results to the whole library. */
+  const back = useCallback((): boolean => {
+    if (location !== '/') navigate('/');
+    else if (isFiltered(filter)) setFilter(NO_FILTER);
+    else return false;
+    return true;
+  }, [location, navigate, filter]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -48,12 +61,8 @@ export function Tv() {
         event.preventDefault();
         command('fullscreen').catch(() => setError('Impossible de passer en plein écran.'));
       } else if (event.key === 'Escape' || event.key === 'Backspace') {
-        if (location !== '/') {
+        if (back()) {
           event.preventDefault();
-          navigate('/');
-        } else if (isFiltered(filter)) {
-          event.preventDefault();
-          setFilter(NO_FILTER); // back to the whole library
         } else if (event.key === 'Escape' && state?.fullscreen) {
           command('fullscreen', false).catch(() => {});
         }
@@ -61,7 +70,7 @@ export function Tv() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [location, navigate, state?.fullscreen, filter]);
+  }, [back, state?.fullscreen]);
 
   // The TV follows what a phone looks at: its page, and the film it picked. Not on first load
   // (the TV opens on its own home), only when a phone moves.
@@ -97,8 +106,8 @@ export function Tv() {
       return;
     }
     if (main.current.contains(document.activeElement)) return;
-    const back = location === '/' ? findItem(main.current, lastGroup.current) : null;
-    (back ?? main.current.querySelector<HTMLElement>('[data-nav]'))?.focus();
+    const card = location === '/' ? findItem(main.current, lastGroup.current) : null;
+    (card ?? firstItem(main.current))?.focus();
   }, [library, location, filter]);
 
   const onError = (message: string) => {
@@ -116,12 +125,15 @@ export function Tv() {
         ) : (
           <Switch>
             <Route path="/g/:id">
-              {(params) => <GroupPage library={library} groupId={params.id} onError={onError} />}
+              {(params) => (
+                <GroupPage library={library} groupId={params.id} onBack={back} onError={onError} />
+              )}
             </Route>
             <Route>
               <Home
                 library={library}
                 filter={filter}
+                onBack={back}
                 offerIntegration={!!state?.offerIntegration}
                 onError={onError}
               />
