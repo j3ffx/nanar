@@ -4,6 +4,15 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.5.0 — 2026-10-30
+
+### Nouveautés
+
+- **La mise à jour en un clic** : dans les réglages de la télé, coche « Chercher les nouvelles
+  versions ». Nanar demande alors à GitHub, une fois par jour, s’il y a du nouveau (rien d’autre
+  n’est envoyé), et la bibliothèque propose d’installer la version suivante : Nanar la
+  télécharge, vérifie son SHA-256, remplace son dossier et redémarre. Décochée par défaut.
+
 ## 0.4.0 — 2026-10-30
 
 L’hôtel et les jaquettes.
