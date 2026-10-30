@@ -94,7 +94,9 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   on the TV page (`/api/online`, this machine only, the keys never sent back to a page): TMDb
   (title and year → poster, summary) and OpenSubtitles (title, year, episode, the video's hash →
   French subtitles, kept in the data directory, never next to the films). `online.py` says what
-  is sent; nothing else ever is. The server listens on the local network for the phones; who may call what
+  is sent; nothing else ever is. A third box, off by default, has the Windows build ask GitHub's
+  API for the latest release once a day (`updates.py`); a yes on the TV page downloads it,
+  checks its SHA-256, and a PowerShell script swaps the folders once Nanar has closed. The server listens on the local network for the phones; who may call what
   is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
   rebinding), or a phone carrying the pairing key (`nanar_key` cookie, `HttpOnly`,
   `SameSite=Strict`, or a Bearer header). Anything that changes state needs a JSON body; no CORS

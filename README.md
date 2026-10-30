@@ -77,7 +77,10 @@ Sur **Windows 10 ou 11** :
 
 Le fichier `.sha256` à côté du zip permet de vérifier qu’il n’a pas été altéré. Tes réglages, ta
 progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier de Nanar :
-pour une nouvelle version, remplace simplement le dossier.
+pour une nouvelle version, remplace simplement le dossier. Plus simple : dans **Réglages**, sur la
+télé, coche « Chercher les nouvelles versions ». Nanar demande alors à GitHub, une fois par jour,
+s’il y a du nouveau, et propose de s’installer en un clic : il télécharge le zip, vérifie son
+SHA-256, remplace son dossier et redémarre.
 
 **Désinstaller :** si tu as accepté le menu Démarrer et le clic droit, retire-les d’abord : dans
 le dossier `Nanar`, clic droit dans le vide → « Ouvrir dans le Terminal », puis
