@@ -7,16 +7,14 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> **Version 0.2.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
+> **Version 0.3.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
 > lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes ; « À suivre », la
-> recherche et les aperçus de la barre de progression t’aident à choisir sans te lever. La
-> prochaine version apporte le mode nuit, la minuterie et les pistes retenues d’un épisode à
-> l’autre. Pour
+> recherche et les aperçus de la barre de progression t’aident à choisir sans te lever ; le mode
+> nuit, la minuterie et les pistes retenues d’un épisode à l’autre accompagnent la soirée. Pour
 > Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte : le
 > [journal des changements](CHANGELOG.md).
 
-![L’accueil sur la télé, en mode démo : les sagas et les séries, les films, et le QR code qui
-transforme le téléphone en télécommande](docs/capture-tele.png)
+![L’accueil sur la télé, en mode démo : « À suivre », puis « Récemment ajoutés »](docs/capture-tele.png)
 
 <p align="center">
   <img src="docs/capture-bibliotheque.png" width="280" alt="La bibliothèque sur le téléphone">

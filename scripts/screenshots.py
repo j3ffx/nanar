@@ -17,7 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
-BASE = "http://127.0.0.1:8642"
+PORT = 8650  # not 8642: a Nanar of one's own may be running
+BASE = f"http://127.0.0.1:{PORT}"
 EDGE = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / (
     r"Microsoft\Edge\Application\msedge.exe"
 )
@@ -82,7 +83,7 @@ def main() -> int:
         watch_a_little(data)
         env = os.environ | {"NANAR_DATA_DIR": data, "NANAR_SHOW_ADDRESS": "192.0.2.10"}
         nanar = subprocess.Popen(
-            [sys.executable, "-m", "nanar", "--demo", "--headless"],
+            [sys.executable, "-m", "nanar", "--demo", "--headless", "--port", str(PORT)],
             env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

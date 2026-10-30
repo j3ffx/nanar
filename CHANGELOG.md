@@ -4,6 +4,32 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.3.0 — 2026-10-30
+
+La soirée : ce qui se passe pendant le film.
+
+### Nouveautés
+
+- **Les pistes retenues** : si tu choisis la VO et les sous-titres pour un épisode, depuis le
+  téléphone ou avec `B` et `V`, les épisodes suivants de la série (ou les films de la saga) les
+  gardent.
+- **Le mode nuit**, sur la télécommande : les explosions plus douces, les dialogues plus
+  audibles. Il reste actif pour les vidéos suivantes, jusqu’à la fermeture de Nanar.
+- **La minuterie** : arrêter la lecture à la fin de l’épisode (sans enchaîner le suivant), ou dans
+  15 min, 30 min, 1 h ou 1 h 30. La télé prévient une minute avant.
+- **Les chapitres** : chapitre précédent ou suivant depuis le téléphone, quand la vidéo en a.
+- **Vu, pas vu** : depuis le téléphone, marquer une vidéo comme vue ou non vue, et retirer de « À
+  suivre » le film que tu as abandonné (il revient si tu le relances).
+- **Récemment ajoutés**, sur la télé et le téléphone : ce qui est arrivé dans le dossier ce
+  mois-ci.
+- Sur la télé, un bouton « ← Retour » au-dessus d’une saga et des résultats de recherche, pour la
+  souris comme pour les flèches.
+
+### Corrections
+
+- Si l’entrée « Ouvrir avec Nanar » du clic droit a disparu après un « Oui », la télé la propose
+  de nouveau.
+
 ## 0.2.1 — 2026-10-29
 
 ### Corrections
