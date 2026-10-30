@@ -4,6 +4,24 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.4.0 — 2026-10-30
+
+L’hôtel et les jaquettes.
+
+### Nouveautés
+
+- **Mode hôtel**, en bas de la bibliothèque sur la télé : quand le Wi-Fi isole le téléphone du PC
+  (souvent à l’hôtel), Nanar ouvre le point d’accès sans fil de Windows, qui partage la connexion
+  du PC, et affiche un QR code pour le rejoindre, puis celui de la télécommande. Il le referme en
+  partant.
+- **Réglages**, sur la télé : de quoi activer, avec ta propre clé gratuite, deux services en
+  ligne. Sans clé, Nanar ne demande toujours rien à Internet.
+  - **Affiches et résumés** (TMDb) pour les films et les séries ; tes propres affiches restent
+    prioritaires. Nanar envoie le titre et l’année lus dans le nom du fichier.
+  - **Sous-titres français en ligne** (OpenSubtitles), depuis les sous-titres de la
+    télécommande ; ils reviennent tout seuls pour les épisodes suivants. Nanar envoie le titre,
+    l’année, l’épisode et l’empreinte de la vidéo.
+
 ## 0.3.0 — 2026-10-30
 
 La soirée : ce qui se passe pendant le film.

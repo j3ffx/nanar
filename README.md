@@ -7,10 +7,11 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> **Version 0.3.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
+> **Version 0.4.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
 > lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes ; « À suivre », la
 > recherche et les aperçus de la barre de progression t’aident à choisir sans te lever ; le mode
-> nuit, la minuterie et les pistes retenues d’un épisode à l’autre accompagnent la soirée. Pour
+> nuit, la minuterie et les pistes retenues d’un épisode à l’autre accompagnent la soirée ; le
+> mode hôtel ouvre un Wi-Fi quand celui de l’hôtel isole le téléphone. Pour
 > Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte : le
 > [journal des changements](CHANGELOG.md).
 
