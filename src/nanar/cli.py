@@ -232,7 +232,9 @@ def offers_integration(settings: Settings) -> bool:
 
     if integration.is_installed(Path(sys.executable)):
         return False
-    return not settings.integration_answered
+    # Said yes before, but the menus are gone or point to where Nanar was: offer again. A "no",
+    # or `--uninstall`, leaves no Start menu entry behind, and is not asked again.
+    return not settings.integration_answered or integration.start_menu_shortcut().is_file()
 
 
 def remove_integration() -> None:
