@@ -74,7 +74,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   of a video (`keep-open`); the next one (`Session.load`) plays in the same window after the
   controller's countdown, with `pause=no` and `start` as options of that file.
 - **Progress** (`progress.py`, SQLite) is keyed by library folder and path inside it, saved every
-  ten seconds of playback and on stop; past 90 % a video is watched (and stays so).
+  ten seconds of playback and on stop; past 90 % a video is watched (and stays so). A phone may
+  mark it watched or not, or hide it from « À suivre » until it plays again. Tracks picked by
+  hand (phone, or mpv's `B`/`V` routed through the controller) are kept per saga or series
+  (`Pick`) and found again in the next video by language and title.
 - **Pictures** (`thumbnails.py`): the user's poster first, else one frame grabbed by libmpv in the
   background (never anything from the Internet); their URL carries the file's age. The phone's
   progress bar shows frames of the video playing (`previews.py`), grabbed when asked.
@@ -83,7 +86,8 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - **mpv's callbacks never wait.** They come from mpv's event thread, and closing mpv waits for that
   thread: whatever they report runs on the controller's worker thread (`controller.py`).
 - **Languages:** French audio first, then English; French subtitles, left off when the audio is
-  already French (forced ones excepted). `Settings` holds the lists.
+  already French (forced ones excepted). `Settings` holds the lists. Night mode (an audio filter)
+  lasts until Nanar closes, never across runs.
 - **Local and private.** No telemetry, no account, no request to the Internet: the library is read
   from file names only. The server listens on the local network for the phones; who may call what
   is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS

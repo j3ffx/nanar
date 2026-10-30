@@ -9,7 +9,9 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
 > **Version 0.2.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
 > lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes ; « À suivre », la
-> recherche et les aperçus de la barre de progression t’aident à choisir sans te lever. Pour
+> recherche et les aperçus de la barre de progression t’aident à choisir sans te lever. La
+> prochaine version apporte le mode nuit, la minuterie et les pistes retenues d’un épisode à
+> l’autre. Pour
 > Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte : le
 > [journal des changements](CHANGELOG.md).
 
@@ -32,7 +34,10 @@ transforme le téléphone en télécommande](docs/capture-tele.png)
 - **Reprendre là où tu t’étais arrêté.** Nanar retient où tu en es dans chaque vidéo, coche celles
   que tu as vues, et enchaîne l’épisode suivant après un compte à rebours de dix secondes (`N`
   pour lancer tout de suite, `S` pour arrêter). En tête de la bibliothèque, « À suivre » te
-  remet sous les yeux le film laissé en cours et l’épisode qui suit le dernier que tu as vu.
+  remet sous les yeux le film laissé en cours et l’épisode qui suit le dernier que tu as vu, et
+  « Récemment ajoutés » ce qui vient d’arriver dans le dossier. Depuis le téléphone, tu peux
+  marquer une vidéo comme vue (ou non vue) et retirer de « À suivre » le film que tu as
+  abandonné.
 - **Toujours à jour.** Un film qui finit de se télécharger dans le dossier apparaît tout seul.
 - **Une fenêtre, comme un lecteur vidéo.** L’accueil s’anime pendant que tu choisis ; le film
   s’ouvre à la même place, à la même taille, et Nanar revient quand il s’arrête. En fenêtre ou en
@@ -40,8 +45,11 @@ transforme le téléphone en télécommande](docs/capture-tele.png)
 - **La télécommande dans ta poche.** Scanne le QR code affiché sur la télé : ton téléphone
   (Android ou iPhone, rien à installer) devient la télécommande. Parcours la bibliothèque, choisis
   un film (la télé suit ce que tu regardes, pour que tout le monde voie), puis lecture, pause,
-  ±10 s, ±1 min, épisode suivant, volume, pistes audio et sous-titres, plein écran. La télé affiche
-  ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
+  ±10 s, ±1 min, épisode suivant, chapitres, volume, pistes audio et sous-titres, plein écran. La
+  télé affiche ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
+- **Pour la soirée.** Le mode nuit adoucit les explosions et remonte les dialogues, pour ne pas
+  réveiller les voisins. La minuterie arrête la lecture à la fin de l’épisode, ou dans 15 min à
+  1 h 30. Si tu choisis la VO et les sous-titres pour un épisode, la suite de la série les garde.
 - **Trouver vite.** Cherche un titre depuis le téléphone (les accents ne comptent pas), ou ne
   garde que les films, les séries, ce que tu n’as pas vu : la télé montre les mêmes résultats. En
   glissant la barre de progression, tu vois l’image du film à cet endroit.
@@ -127,8 +135,8 @@ Pendant un film, les habitudes de VLC :
 | `Ctrl` + `←` `→` | 1 minute en arrière / en avant       |
 | `↑` `↓`, molette | volume                               |
 | `M`              | couper le son                        |
-| `B`              | piste audio suivante                 |
-| `V`              | sous-titres suivants                 |
+| `B`              | piste audio suivante (retenue)       |
+| `V`              | sous-titres suivants (retenus)       |
 | `G` `H`          | décaler les sous-titres              |
 | `N` `P`          | épisode ou film suivant / précédent  |
 | `F`, double clic | plein écran                          |
