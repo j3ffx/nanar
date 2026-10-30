@@ -53,8 +53,10 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
   glissant la barre de progression, tu vois l’image du film à cet endroit.
 - **Tout se lit.** Le moteur de [mpv](https://mpv.io/) : tous les formats courants, les pistes
   audio et les sous-titres, le HDR. Nanar choisit la VF, sinon la VO avec les sous-titres français.
-- **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques, pas même une jaquette
-  téléchargée : tout vient de tes fichiers.
+- **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques : tout vient de tes
+  fichiers. Si tu veux des affiches, des résumés et des sous-titres en ligne, tu donnes à Nanar ta
+  propre clé TMDb ou OpenSubtitles dans ses réglages (voir plus bas) ; sans clé, il ne demande
+  rien à personne.
 
 ## Installer
 
@@ -114,10 +116,31 @@ télé peut le piloter ; `nanar --new-key` change le code (les téléphones déj
 rescanner), et `nanar --local` coupe la télécommande.
 
 **À l’hôtel ou chez des amis**, le Wi-Fi isole souvent les appareils les uns des autres : le
-téléphone ne voit pas le PC. Active alors le partage de connexion de ton téléphone et connecte le PC
-dessus ; le QR code de la télé suit le changement de réseau en quelques secondes. Les échanges ne
+téléphone ne voit pas le PC. Sur la télé, choisis **Mode hôtel** (en bas de la bibliothèque) :
+Nanar ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et affiche deux
+QR codes, l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme en partant.
+Autre solution : active le partage de connexion de ton téléphone et connecte le PC dessus ; le QR
+code de la télé suit le changement de réseau en quelques secondes. Les échanges ne
 sont pas chiffrés : sur un Wi-Fi public partagé, quelqu’un sur le même réseau pourrait voir ce que tu
 regardes.
+
+## Affiches et sous-titres en ligne (en option)
+
+Sans rien faire, Nanar ne demande rien à Internet. Pour avoir les affiches et les résumés des films
+et des séries, ou des sous-titres français quand une vidéo n’en a pas, ouvre **Réglages** en bas
+de la bibliothèque, sur la télé, et colle ta clé :
+
+- **TMDb**, pour les affiches et les résumés : une clé d’API gratuite, sur
+  [themoviedb.org](https://www.themoviedb.org/settings/api) (un compte, puis Paramètres › API).
+  Nanar envoie le titre et l’année lus dans le nom de chaque fichier.
+- **OpenSubtitles**, pour les sous-titres : une clé gratuite, sur
+  [opensubtitles.com](https://www.opensubtitles.com/consumers) (« API consumers »), qui donne
+  cinq sous-titres par jour. Le bouton apparaît alors dans les sous-titres de la télécommande.
+  Nanar envoie le titre, l’année, l’épisode et l’empreinte de la vidéo (pour trouver des
+  sous-titres calés sur ta version) ; ils sont gardés dans le dossier de données de Nanar, pas à
+  côté de tes films, et reviennent tout seuls pour les épisodes suivants.
+
+Rien d’autre ne part : ni la liste de tes films, ni ton adresse. Retirer la clé arrête tout.
 
 ## Les touches
 
@@ -188,6 +211,9 @@ Les règles du dépôt (commandes, commits, confidentialité, invariants) : [CLA
   [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf) (LGPL 2.1 ou plus).
 - Police [Bricolage Grotesque](https://github.com/ateliertriay/bricolage) (SIL Open Font License).
 - La version Windows est assemblée par [PyInstaller](https://pyinstaller.org/).
+- Affiches et résumés, en option : [TMDB](https://www.themoviedb.org/). Ce produit utilise l’API
+  TMDB mais n’est ni approuvé ni certifié par TMDB. Sous-titres, en option :
+  [OpenSubtitles](https://www.opensubtitles.com/).
 
 ## Licence
 

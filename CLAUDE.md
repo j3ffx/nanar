@@ -78,8 +78,9 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   mark it watched or not, or hide it from « À suivre » until it plays again. Tracks picked by
   hand (phone, or mpv's `B`/`V` routed through the controller) are kept per saga or series
   (`Pick`) and found again in the next video by language and title.
-- **Pictures** (`thumbnails.py`): the user's poster first, else one frame grabbed by libmpv in the
-  background (never anything from the Internet); their URL carries the file's age. The phone's
+- **Pictures** (`thumbnails.py`): the user's poster first, then TMDb's when the user gave a key
+  (`metadata.py`), else one frame grabbed by libmpv in the background; their URL carries the
+  file's age. The phone's
   progress bar shows frames of the video playing (`previews.py`), grabbed when asked.
 - **The TV follows the phone** (`set_view`): the page, the item and the search a phone looks
   at; not the other way round.
@@ -88,8 +89,12 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - **Languages:** French audio first, then English; French subtitles, left off when the audio is
   already French (forced ones excepted). `Settings` holds the lists. Night mode (an audio filter)
   lasts until Nanar closes, never across runs.
-- **Local and private.** No telemetry, no account, no request to the Internet: the library is read
-  from file names only. The server listens on the local network for the phones; who may call what
+- **Local and private.** No telemetry, no account, no request to the Internet by default: the
+  library is read from file names only. Two services are opt-in, each with the user's own key set
+  on the TV page (`/api/online`, this machine only, the keys never sent back to a page): TMDb
+  (title and year → poster, summary) and OpenSubtitles (title, year, episode, the video's hash →
+  French subtitles, kept in the data directory, never next to the films). `online.py` says what
+  is sent; nothing else ever is. The server listens on the local network for the phones; who may call what
   is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
   rebinding), or a phone carrying the pairing key (`nanar_key` cookie, `HttpOnly`,
   `SameSite=Strict`, or a Bearer header). Anything that changes state needs a JSON body; no CORS
@@ -113,6 +118,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   page, to add a Start menu entry and "Ouvrir avec Nanar" on folders (`desktop/integration.py`:
   the user's own HKCU and Start menu folder only); nothing is written before a yes. Folders are
   opened, and those menus answered, from this machine only (`/api/open`, `/api/integration`).
+- **Mode hôtel** (`hotspot.py`): asked on the TV page only, Nanar turns on Windows' mobile
+  hotspot (WinRT through PowerShell, no dependency), shows its name and password as a Wi-Fi QR
+  code (this machine's page only, never in the live state or a log), points the remote's QR code
+  at the hotspot's address, and turns it off on exit if it turned it on.
 - **One Nanar at a time.** A second launch hands its folder to the running one (`/api/open`) and
   stops; a page can't do that, only a process on this machine.
 - **The Windows build has no console**: output goes to `nanar.log` in the data directory.
@@ -128,8 +137,9 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 - `src/nanar/`: Python package. `library.py` (reading release names with guessit, sagas and
   series), `player.py` (one mpv window per video, VLC-like keys), `controller.py` (the single place
   where state changes), `app.py` (API, WebSocket, pages, manifest), `security.py` and
-  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `progress.py` (and "À
-  suivre"), `thumbnails.py`, `previews.py` (frames for the progress bar), `watcher.py` (the
+  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `hotspot.py` (mode hôtel),
+  `progress.py` (and "À suivre"), `online.py`, `metadata.py` and `subtitles.py` (the opt-in
+  services), `thumbnails.py`, `previews.py` (frames for the progress bar), `watcher.py` (the
   folder, followed), `desktop/` (the pywebview window, Win32 calls placing windows), `demo.py`
   (made-up library played from mpv's `lavfi` sources), `cli.py`.
   `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
