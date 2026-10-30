@@ -421,3 +421,23 @@
   outline: 4px solid var(--focus);
   outline-offset: 2px;
 }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: clamp(1rem, 1.2vw, 1.2rem);
+  cursor: pointer;
+}
+
+.check input {
+  width: 1.4em;
+  height: 1.4em;
+  accent-color: var(--accent);
+}
+
+.check input:focus {
+  outline: 4px solid var(--focus);
+  outline-offset: 3px;
+}

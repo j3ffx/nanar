@@ -88,6 +88,7 @@ def open_folder(
     from nanar.progress import Progress
     from nanar.subtitles import Subtitles
     from nanar.thumbnails import Thumbnails
+    from nanar.updates import Updates
 
     settings_path = data_dir(demo=demo) / "settings.json"
     settings = Settings.load(settings_path)
@@ -122,6 +123,19 @@ def open_folder(
     controller.metadata = metadata
     controller.subtitles = Subtitles(data_dir(demo=demo) / "subtitles")
     controller.subtitles.configure(settings.opensubtitles_key)
+
+    def mark_checked(at: float) -> None:
+        settings.update_checked_at = at
+        settings.save(settings_path)
+
+    updates = Updates(
+        enabled=lambda: settings.check_updates,
+        checked_at=lambda: settings.update_checked_at,
+        mark_checked=mark_checked,
+        on_change=controller.library_changed,
+    )
+    controller.updates = updates
+    updates.start()
     if not demo:  # the demo keeps its coloured cards: frames of test patterns show nothing
         thumbnails.schedule(library)
     metadata.schedule(library)
@@ -159,6 +173,7 @@ def open_folder(
         controller.shutdown()
         thumbnails.stop()
         metadata.stop()
+        updates.stop()
         folders.stop()
         announcer.stop()
         wifi.close()
@@ -223,6 +238,18 @@ class Desktop:
         self._settings.integration_answered = True
         self._settings.save(self._settings_path)
 
+    def update(self) -> None:
+        from nanar import updates
+
+        if self._controller.updates is None:
+            raise CommandError("not_supported")
+        try:
+            command = self._controller.updates.prepare(Path(sys.executable).parent)
+        except updates.UpdateError as error:
+            raise CommandError(error.code) from error
+        updates.launch(command)
+        self._window.close()  # the swap waits for Nanar to be gone
+
 
 class _LazyDesktop:
     """The desktop, once the window exists (the API is made before it)."""
@@ -246,6 +273,9 @@ class _LazyDesktop:
 
     def integrate(self, install: bool) -> None:
         self._desktop().integrate(install)
+
+    def update(self) -> None:
+        self._desktop().update()
 
 
 def offers_integration(settings: Settings) -> bool:

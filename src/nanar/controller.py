@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from nanar.previews import Previews
     from nanar.subtitles import Subtitles
     from nanar.thumbnails import Thumbnails
+    from nanar.updates import Updates
 
 Listener = Callable[[dict[str, Any]], None]
 
@@ -111,6 +112,7 @@ class Controller:
         self.previews = previews
         self.metadata: Metadata | None = None
         self.subtitles: Subtitles | None = None
+        self.updates: Updates | None = None
         self._settings_path = settings_path
         self._sessions = sessions
         self._demo = demo
@@ -196,6 +198,7 @@ class Controller:
                 "night": self._night,
                 "sleep": sleep,
                 "hotspot": dict(self._hotspot),
+                "updates": self.updates.state() if self.updates else None,
                 "online": {
                     "posters": bool(self.metadata and self.metadata.enabled),
                     "subtitles": bool(self.subtitles and self.subtitles.enabled),
@@ -407,6 +410,17 @@ class Controller:
                 return
         with contextlib.suppress(CommandError):
             self.find_subtitles()
+
+    def set_check_updates(self, enabled: bool) -> None:
+        """Looks for new versions on GitHub (once a day), or stops."""
+        with self._lock:
+            self.settings.check_updates = enabled
+            if not enabled and self.updates is not None:
+                self.updates.available = None
+            self._save_settings()
+        if enabled and self.updates is not None:
+            self.updates.poke()
+        self._announce()
 
     def set_online(self, *, tmdb: str | None = None, opensubtitles: str | None = None) -> None:
         """New keys ("" takes one away): each is tried first. Raises CommandError("bad_key"),

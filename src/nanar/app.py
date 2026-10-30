@@ -65,6 +65,10 @@ class HotspotBody(BaseModel):
     on: bool
 
 
+class UpdatesBody(BaseModel):
+    enabled: bool
+
+
 class OnlineBody(BaseModel):
     """New keys for the online services: a field left out keeps its key, "" takes it away."""
 
@@ -84,6 +88,9 @@ class Desktop(Protocol):
 
     def integrate(self, install: bool) -> None:
         """Adds (or not) Nanar to the Start menu and to the folders' right-click menu."""
+
+    def update(self) -> None:
+        """Installs the new version found, and closes Nanar for it."""
 
 
 class PairBody(BaseModel):
@@ -237,6 +244,24 @@ def create_app(
         if not _caller(request).local or not (status.on and status.ssid and status.passphrase):
             return JSONResponse({"code": "no_hotspot"}, status_code=404)
         return _svg(wifi_qr(status.ssid, status.passphrase))
+
+    @app.post("/api/updates", status_code=204, response_model=None)
+    async def check_updates(body: UpdatesBody, request: Request) -> JSONResponse | None:
+        """Looks for new versions (or stops): this machine only, as it asks GitHub."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        controller.set_check_updates(body.enabled)
+        return None
+
+    @app.post("/api/update", status_code=204, response_model=None)
+    async def update(request: Request) -> JSONResponse | None:
+        """Installs the version found: Nanar closes, and the new one starts."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        if desktop is None:
+            raise CommandError("no_window")
+        await asyncio.to_thread(desktop.update)
+        return None
 
     @app.post("/api/subtitles", status_code=204)
     async def subtitles() -> None:

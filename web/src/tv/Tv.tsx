@@ -136,7 +136,7 @@ export function Tv() {
               />
             </Route>
             <Route path="/reglages">
-              <Settings onBack={back} />
+              <Settings updates={state?.updates ?? null} onBack={back} />
             </Route>
             <Route path="/g/:id">
               {(params) => (
@@ -148,6 +148,7 @@ export function Tv() {
                 library={library}
                 filter={filter}
                 onBack={back}
+                update={state?.updates?.supported ? state.updates : null}
                 offerIntegration={!!state?.offerIntegration}
                 onError={onError}
               />

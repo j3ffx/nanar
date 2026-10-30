@@ -93,6 +93,13 @@ export interface State {
   sleep: { kind: 'end' } | { kind: 'timer'; remaining: number } | null;
   /** Mode hôtel: the PC's own Wi-Fi, which phones join to reach Nanar. */
   hotspot: { available: boolean; on: boolean; ssid: string | null };
+  /** New versions of the Windows build, looked for on GitHub when the user said so. */
+  updates: {
+    supported: boolean;
+    enabled: boolean;
+    available: string | null;
+    installing: boolean;
+  } | null;
   /** Which online services have a key (off by default). */
   online: { posters: boolean; subtitles: boolean };
   /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
@@ -148,6 +155,12 @@ export interface OnlineSettings {
   tmdb: { set: boolean; hint: string | null; error: string | null };
   opensubtitles: { set: boolean; hint: string | null };
 }
+
+/** This machine only: looks for new versions once a day (or stops). */
+export const setCheckUpdates = (enabled: boolean) => send('/api/updates', { enabled });
+
+/** This machine only: installs the new version; Nanar closes and starts again. */
+export const installUpdate = () => send('/api/update', {});
 
 /** This machine only: which online services have a key. */
 export async function fetchOnline(): Promise<OnlineSettings> {

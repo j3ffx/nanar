@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { ApiError, fetchOnline, setOnline, type OnlineSettings } from '@/lib/api';
+import {
+  ApiError,
+  fetchOnline,
+  setCheckUpdates,
+  setOnline,
+  type OnlineSettings,
+  type State,
+} from '@/lib/api';
 
 import { BackButton } from './BackButton';
 import styles from './Tv.module.css';
@@ -14,7 +21,7 @@ const MESSAGES: Record<string, string> = {
 type Service = 'tmdb' | 'opensubtitles';
 
 /** The settings, on this machine only: the keys of the online services, off by default. */
-export function Settings({ onBack }: { onBack: () => void }) {
+export function Settings({ updates, onBack }: { updates: State['updates']; onBack: () => void }) {
   const [online, setOnlineState] = useState<OnlineSettings | null>(null);
   const reload = () =>
     fetchOnline()
@@ -60,6 +67,36 @@ export function Settings({ onBack }: { onBack: () => void }) {
             Ce produit utilise l’API TMDB mais n’est ni approuvé ni certifié par TMDB.
           </p>
         </>
+      )}
+      {updates && (
+        <div className={styles.setting}>
+          <p className={styles.settingTitle}>Mises à jour</p>
+          {updates.supported ? (
+            <>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  data-nav
+                  checked={updates.enabled}
+                  onChange={(event) => void setCheckUpdates(event.target.checked)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void setCheckUpdates(!updates.enabled);
+                  }}
+                />
+                Chercher les nouvelles versions (une fois par jour, sur GitHub)
+              </label>
+              <p className={styles.note}>
+                {updates.available
+                  ? `Nanar ${updates.available} est sorti : la bibliothèque propose de l’installer.`
+                  : updates.enabled
+                    ? 'Tu es à jour.'
+                    : 'Désactivé : Nanar ne demande rien à GitHub.'}
+              </p>
+            </>
+          ) : (
+            <p className={styles.note}>Lancé depuis les sources : `git pull` le met à jour.</p>
+          )}
+        </div>
       )}
     </section>
   );

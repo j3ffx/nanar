@@ -292,6 +292,9 @@ class FakeDesktop:
     def integrate(self, install: bool) -> None:
         self.integrated.append(install)
 
+    def update(self) -> None:
+        self.updated = True
+
 
 def desktop_app(controller: Controller, desktop: FakeDesktop) -> tuple[TestClient, TestClient]:
     app = create_app(controller, key=KEY, network=Network(port=8642), desktop=desktop)
@@ -415,3 +418,15 @@ def test_a_refused_key_is_not_kept(client: TestClient, monkeypatch: pytest.Monke
     answer = client.post("/api/online", json={"tmdb": "wrongwrong"})
     assert answer.json() == {"code": "bad_key"}
     assert not client.get("/api/online").json()["tmdb"]["set"]
+
+
+def test_only_this_machine_installs_an_update(controller: Controller) -> None:
+    desktop = FakeDesktop()
+    tv, phone = desktop_app(controller, desktop)
+    pair(phone)
+    assert phone.post("/api/update", json={}).status_code == 403
+    assert phone.post("/api/updates", json={"enabled": True}).status_code == 403
+    assert tv.post("/api/updates", json={"enabled": True}).status_code == 204
+    assert controller.settings.check_updates
+    assert tv.post("/api/update", json={}).status_code == 204
+    assert desktop.updated

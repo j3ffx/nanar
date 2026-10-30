@@ -1,6 +1,15 @@
 import { useLocation } from 'wouter';
 
-import { answerIntegration, chooseFolder, play, type Library } from '@/lib/api';
+import { useState } from 'react';
+
+import {
+  answerIntegration,
+  chooseFolder,
+  installUpdate,
+  play,
+  type Library,
+  type State,
+} from '@/lib/api';
 import { filterEntries, filterLabel, isFiltered, type Filter } from '@/lib/filter';
 import { countLabel } from '@/lib/format';
 import { continueLabel, groupWatched, ratioOf } from '@/lib/progress';
@@ -15,14 +24,17 @@ interface Props {
   filter: Filter;
   /** Leaves the search results. */
   onBack: () => void;
+  /** A new version found on GitHub (the Windows build, when the user asked). */
+  update: State['updates'];
   /** The Windows build's first run: offer the Start menu and the right-click menu. */
   offerIntegration: boolean;
   onError: (message: string) => void;
 }
 
 /** The whole library: what to continue, what's new, sagas and series, then the films. */
-export function Home({ library, filter, onBack, offerIntegration, onError }: Props) {
+export function Home({ library, filter, onBack, update, offerIntegration, onError }: Props) {
   const [, navigate] = useLocation();
+  const [later, setLater] = useState(false);
   const groups = library.entries.filter((e) => e.kind === 'group');
   const films = library.entries.filter((e) => e.kind === 'video');
 
@@ -107,6 +119,31 @@ export function Home({ library, filter, onBack, offerIntegration, onError }: Pro
 
   return (
     <>
+      {update?.available && !later && (
+        <aside className={styles.offer}>
+          {update.installing ? (
+            <p>Installation de Nanar {update.available}… il va redémarrer tout seul.</p>
+          ) : (
+            <>
+              <p>Nanar {update.available} est sorti. L’installer maintenant ?</p>
+              <button
+                type="button"
+                data-nav
+                onClick={() =>
+                  void installUpdate().catch(() =>
+                    onError('La mise à jour a échoué : réessaie plus tard.'),
+                  )
+                }
+              >
+                Mettre à jour
+              </button>
+              <button type="button" data-nav onClick={() => setLater(true)}>
+                Plus tard
+              </button>
+            </>
+          )}
+        </aside>
+      )}
       {offerIntegration && (
         <aside className={styles.offer}>
           <p>

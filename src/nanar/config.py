@@ -36,6 +36,9 @@ class Settings:
     # Keys the user got from TMDb and OpenSubtitles: without one, Nanar never asks them anything.
     tmdb_key: str = ""
     opensubtitles_key: str = ""
+    # New versions looked for on GitHub (the Windows build), at most once a day: off by default.
+    check_updates: bool = False
+    update_checked_at: float = 0.0
 
     @classmethod
     def load(cls, path: Path) -> "Settings":

@@ -42,6 +42,10 @@ class TvWindow:
 
             win32.set_icon(hwnd)
 
+    def close(self) -> None:
+        """Closes the window, which ends Nanar (as its close button does)."""
+        self.window.destroy()
+
     def run(self, on_ready: Callable[[], None] | None = None) -> None:
         """Runs the GUI loop on this (main) thread until the window is closed."""
         self._webview.start(on_ready, private_mode=False)
