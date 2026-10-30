@@ -4,6 +4,7 @@ It needs no file at all, so development, tests and screenshots never touch anyon
 """
 
 import re
+import time
 
 from nanar.library import Library, build
 
@@ -24,6 +25,13 @@ NAMES = [
     "Les.Vampires.du.Camping.1996.TRUEFRENCH.WEB-DL.1080p.mkv",
     "Robo-Facteur.2 (1992).mp4",
 ]
+
+# The ones that arrived lately (days ago), for "Récemment ajoutés".
+ADDED_DAYS = {
+    "Mission Galaxie Oméga 1979 MULTi 1080p x265.mkv": 1,
+    "Les Brigades du Nanar/Saison 2/Les.Brigades.du.Nanar.S02E01.Panique.au.Port.720p.mkv": 4,
+    "Robo-Facteur.2 (1992).mp4": 9,
+}
 
 # Hues for the generated pictures, so that each video looks a little different.
 _HUES = [0, 40, 80, 120, 160, 200, 240, 280, 320]
@@ -59,7 +67,8 @@ def from_time(source: str, at: float) -> str:
 
 
 def library() -> Library:
-    lib = build("Démo", NAMES)
+    now = time.time()
+    lib = build("Démo", NAMES, {name: now - days * 86400 for name, days in ADDED_DAYS.items()})
     for index, video in enumerate(lib.videos.values()):
         video.path = source(index)
     return lib

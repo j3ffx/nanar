@@ -125,6 +125,19 @@ export const Check = () => (
   </Icon>
 );
 
+export const Moon = () => (
+  <Icon>
+    <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
+  </Icon>
+);
+
+export const Timer = () => (
+  <Icon>
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2.5 2.5M9.5 2.5h5" />
+  </Icon>
+);
+
 export const Grid = () => (
   <Icon>
     <rect x="4" y="4" width="7" height="9" rx="1.5" />

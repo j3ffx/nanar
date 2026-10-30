@@ -20,7 +20,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-/** The whole library: what to continue, sagas and series, then the films on their own. */
+/** The whole library: what to continue, what's new, sagas and series, then the films. */
 export function Home({ library, filter, onBack, offerIntegration, onError }: Props) {
   const [, navigate] = useLocation();
   const groups = library.entries.filter((e) => e.kind === 'group');
@@ -54,11 +54,11 @@ export function Home({ library, filter, onBack, offerIntegration, onError }: Pro
 
   const start = (id: string) => play(id).catch(() => onError('Cette vidéo ne veut pas démarrer.'));
 
-  const groupPoster = (id: string) => {
+  const groupPoster = (id: string, key = id) => {
     const group = library.groups[id]!;
     return (
       <Poster
-        key={id}
+        key={key}
         id={id}
         title={group.title}
         detail={countLabel(group)}
@@ -70,11 +70,11 @@ export function Home({ library, filter, onBack, offerIntegration, onError }: Pro
     );
   };
 
-  const filmPoster = (id: string) => {
+  const filmPoster = (id: string, key = id) => {
     const video = library.videos[id]!;
     return (
       <Poster
-        key={id}
+        key={key}
         id={id}
         title={video.title}
         detail={video.year ?? ''}
@@ -143,6 +143,20 @@ export function Home({ library, filter, onBack, offerIntegration, onError }: Pro
                 />
               );
             })}
+          </div>
+        </section>
+      )}
+      {library.recent.length > 0 && (
+        <section aria-labelledby="recent">
+          <h2 id="recent" className={styles.section}>
+            Récemment ajoutés
+          </h2>
+          <div className={styles.grid}>
+            {library.recent.map(({ kind, id }) =>
+              kind === 'group'
+                ? library.groups[id] && groupPoster(id, `recent-${id}`)
+                : library.videos[id] && filmPoster(id, `recent-${id}`),
+            )}
           </div>
         </section>
       )}

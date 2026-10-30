@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 
-import { play, setView, type Library as LibraryData, type Video } from '@/lib/api';
+import { mark, play, setView, type Library as LibraryData, type Video } from '@/lib/api';
 import { filterEntries, isFiltered, NO_FILTER, type Filter } from '@/lib/filter';
 import { clock, countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
 import { continueLabel, groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
@@ -34,6 +34,12 @@ export function Library({ library, onStarted, onError }: Props) {
   }, [groupId, picked, filter]);
 
   if (library === null) return <p className={styles.loading}>Les bobines arrivent…</p>;
+
+  const change = (video: Video, action: 'watched' | 'unwatched' | 'dismiss') => {
+    navigator.vibrate?.(8);
+    setPicked(null);
+    mark(video.id, action).catch(() => onError('Nanar n’a pas pu le noter.'));
+  };
 
   const start = (video: Video, from?: number) => {
     navigator.vibrate?.(8);
@@ -149,8 +155,46 @@ export function Library({ library, onStarted, onError }: Props) {
                   );
                 })}
               </div>
-              <h2 className={styles.subheading}>Tout</h2>
             </>
+          )}
+          {!filtered && library.recent.length > 0 && (
+            <>
+              <h2 className={styles.subheading}>Récemment ajoutés</h2>
+              <div className={styles.shelf}>
+                {library.recent.map(({ kind, id }) => {
+                  if (kind === 'group') {
+                    const g = library.groups[id];
+                    if (!g) return null;
+                    return (
+                      <Card
+                        key={id}
+                        id={id}
+                        title={g.title}
+                        detail={countLabel(g)}
+                        image={g.thumb}
+                        onClick={() => navigate(`/bibliotheque/g/${id}`)}
+                      />
+                    );
+                  }
+                  const v = library.videos[id];
+                  if (!v) return null;
+                  return (
+                    <Card
+                      key={id}
+                      id={id}
+                      title={v.title}
+                      detail={v.year ? String(v.year) : ''}
+                      image={v.thumb}
+                      progress={ratioOf(v)}
+                      onClick={() => setPicked(v)}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {!filtered && (library.continue.length > 0 || library.recent.length > 0) && (
+            <h2 className={styles.subheading}>Tout</h2>
           )}
           <div className={styles.grid}>
             {entries.map(({ kind, id }) => {
@@ -191,7 +235,7 @@ export function Library({ library, onStarted, onError }: Props) {
         open={picked !== null}
         onClose={() => setPicked(null)}
       >
-        {picked && <Picked video={picked} library={library} onStart={start} />}
+        {picked && <Picked video={picked} library={library} onStart={start} onChange={change} />}
       </Sheet>
     </>
   );
@@ -201,11 +245,14 @@ function Picked({
   video,
   library,
   onStart,
+  onChange,
 }: {
   video: Video;
   library: LibraryData;
   onStart: (video: Video, from?: number) => void;
+  onChange: (video: Video, action: 'watched' | 'unwatched' | 'dismiss') => void;
 }) {
+  const inContinue = library.continue.includes(video.id);
   const resume = resumeLabel(video);
   const group = video.group ? library.groups[video.group] : undefined;
   const p = video.progress;
@@ -240,6 +287,35 @@ function Picked({
       {group && group.videos.length > 1 && (
         <p className={styles.hint}>La suite s’enchaîne toute seule.</p>
       )}
+      <div className={styles.marks}>
+        {p?.watched || (p && p.position > 0) ? (
+          <button
+            type="button"
+            className={styles.tertiary}
+            onClick={() => onChange(video, 'unwatched')}
+          >
+            {p.watched ? 'Marquer comme non vu' : 'Oublier où j’en étais'}
+          </button>
+        ) : null}
+        {!p?.watched && (
+          <button
+            type="button"
+            className={styles.tertiary}
+            onClick={() => onChange(video, 'watched')}
+          >
+            Marquer comme vu
+          </button>
+        )}
+        {inContinue && (
+          <button
+            type="button"
+            className={styles.tertiary}
+            onClick={() => onChange(video, 'dismiss')}
+          >
+            Retirer de « À suivre »
+          </button>
+        )}
+      </div>
     </div>
   );
 }

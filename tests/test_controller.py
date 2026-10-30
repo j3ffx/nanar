@@ -9,8 +9,8 @@ from nanar import controller as controller_module
 from nanar.config import Settings
 from nanar.controller import CommandError, Controller
 from nanar.library import Library, build
-from nanar.player import Rect
-from nanar.progress import Progress
+from nanar.player import Rect, Track
+from nanar.progress import Pick, Progress
 
 from .fakes import FakeSessions, FakeWindow
 
@@ -316,3 +316,116 @@ def test_a_new_reading_of_the_folder_reaches_the_pages(
     assert controller.state()["libraryVersion"] == before + 1
     titles = {v["title"] for v in controller.library_json()["videos"].values()}
     assert "Nouveau" in titles
+
+
+TRACKS = {
+    "audio": [Track(1, "audio", "fre", None, True), Track(2, "audio", "eng", None, False)],
+    "subs": [Track(3, "sub", "fre", "Complets", False)],
+}
+
+
+def test_tracks_picked_by_hand_carry_on_through_the_saga(
+    controller: Controller, library: Library, sessions: FakeSessions
+) -> None:
+    controller.play(video_id(library, "Saga"))
+    assert sessions.last.start.audio is None
+    sessions.last.report(position=5.0, **TRACKS)
+    wait_for(lambda: controller.state()["playing"]["audio"])
+    controller.command("audio", 2)
+    controller.command("sub", 3)
+    controller.command("next")
+    loaded = sessions.last.loaded[-1]
+    assert loaded.audio == Pick("eng", None, 1)
+    assert loaded.sub == Pick("fre", "Complets", 0)
+    controller.command("sub", None)
+    controller.play(video_id(library, "Saga"))
+    assert sessions.last.loaded[-1].sub == Pick(off=True)
+    controller.play(video_id(library, "Seul"))  # a film of its own: its own tracks
+    assert sessions.last.loaded[-1].audio is None
+
+
+def test_mpv_keys_cycle_the_tracks_through_nanar(
+    controller: Controller, library: Library, sessions: FakeSessions
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    sessions.last.report(position=5.0, **TRACKS)
+    wait_for(lambda: controller.state()["playing"]["audio"])
+    sessions.last.callbacks.action("cycle_audio")
+    sessions.last.callbacks.action("cycle_sub")
+    wait_for(lambda: len(sessions.last.commands) == 2)
+    assert sessions.last.commands == [("audio", 2), ("sub", 3)]
+    assert sessions.last.osd == [True, True]
+
+
+def test_night_mode_stays_on_for_the_next_videos(
+    controller: Controller, library: Library, sessions: FakeSessions
+) -> None:
+    controller.command("night")  # before any video: kept for the first one
+    assert controller.state()["night"]
+    controller.play(video_id(library, "Saga"))
+    assert sessions.last.start.night
+    controller.command("night", False, osd=True)
+    assert sessions.last.commands[-1] == ("night", False)
+    controller.command("next")
+    assert not sessions.last.loaded[-1].night
+
+
+def test_sleep_after_this_video_skips_the_countdown(
+    controller: Controller, library: Library, sessions: FakeSessions, window: FakeWindow
+) -> None:
+    with pytest.raises(CommandError, match="nothing_playing"):
+        controller.command("sleep", "end")
+    controller.play(video_id(library, "Saga"))
+    controller.command("sleep", "end")
+    assert controller.state()["sleep"] == {"kind": "end"}
+    sessions.last.finish()
+    wait_for(lambda: window.visible)
+    assert not sessions.last.loaded  # the next one did not start
+    assert controller.state()["sleep"] is None
+
+
+def test_sleep_timer_warns_then_stops(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    window: FakeWindow,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "MINUTE", 0.2)
+    monkeypatch.setattr(controller_module, "SLEEP_WARNING", 0.1)
+    controller.play(video_id(library, "Seul"))
+    with pytest.raises(CommandError, match="bad_value"):
+        controller.command("sleep", 0)
+    controller.command("sleep", 1)
+    assert controller.state()["sleep"]["kind"] == "timer"
+    wait_for(lambda: sessions.last.messages)
+    wait_for(lambda: window.visible)
+    assert "une minute" in sessions.last.messages[0]
+    assert controller.state()["sleep"] is None
+
+
+def test_a_cancelled_sleep_timer_does_nothing(
+    controller: Controller, library: Library, window: FakeWindow
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    controller.command("sleep", 1)
+    controller.command("sleep", None)
+    assert controller.state()["sleep"] is None
+    assert not window.visible
+
+
+def test_phones_mark_videos_and_clear_continue(
+    controller: Controller, library: Library, progress: Progress
+) -> None:
+    seul, saga2 = video_id(library, "Seul"), video_id(library, "Saga 2")
+    progress.save("/films", "Seul 2001.mkv", 600.0, 6000.0, finished=False)
+    progress.save("/films", "Saga/Saga 1990.mkv", 0.0, 6000.0, finished=True)
+    assert controller.library_json()["continue"] == [saga2, seul]
+    controller.mark(saga2, "dismiss")  # the next of the saga: hides the one watched before it
+    assert controller.library_json()["continue"] == [seul]
+    controller.mark(seul, "watched")
+    assert controller.library_json()["videos"][seul]["progress"]["watched"]
+    controller.mark(seul, "unwatched")
+    assert controller.library_json()["videos"][seul]["progress"] is None
+    with pytest.raises(CommandError, match="unknown_video"):
+        controller.mark("nope", "watched")

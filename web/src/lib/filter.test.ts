@@ -42,6 +42,7 @@ const library: Library = {
     { kind: 'video', id: 'z' },
   ],
   continue: [],
+  recent: [],
 };
 
 const ids = (filter: Partial<typeof NO_FILTER>) =>

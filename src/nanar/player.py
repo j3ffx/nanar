@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any, ClassVar, Protocol
 
 from nanar.config import Settings
+from nanar.progress import Pick
+
+# Night mode: loud scenes brought down and quiet lines up, for late evenings and thin walls.
+NIGHT_FILTER = "lavfi=[dynaudnorm=f=250:g=15:p=0.6:m=8]"
 
 
 @dataclass(frozen=True)
@@ -87,6 +91,9 @@ class Playback:
     fullscreen: bool = False
     sub_delay: float = 0.0
     sub_scale: float = 1.0
+    night: bool = False
+    chapter: int | None = None  # from 0
+    chapters: int = 0
     audio: list[Track] = field(default_factory=list)
     subs: list[Track] = field(default_factory=list)
 
@@ -101,6 +108,10 @@ class Start:
     # The length of a generated video (the demo's): its stream never says, and mpv's guess
     # grows as it plays.
     length: float | None = None
+    # The tracks picked by hand for its saga or series, found again in this video.
+    audio: Pick | None = None
+    sub: Pick | None = None
+    night: bool = False
 
 
 class Callbacks(Protocol):
@@ -152,8 +163,8 @@ KEY_BINDINGS = {
     "WHEEL_UP": "add volume 5",
     "WHEEL_DOWN": "add volume -5",
     "m": "cycle mute",
-    "b": "cycle audio",
-    "v": "cycle sub",
+    "b": "script-message nanar cycle_audio",  # through Nanar, which remembers the choice
+    "v": "script-message nanar cycle_sub",
     "g": "add sub-delay -0.1",
     "h": "add sub-delay 0.1",
     "n": "script-message nanar next",
@@ -161,6 +172,33 @@ KEY_BINDINGS = {
     "s": "script-message nanar stop",
     "q": "script-message nanar stop",
 }
+
+
+def choose(tracks: list[Track], pick: Pick | None) -> int | str | None:
+    """The track to select for a pick made in another video: "no" for no subtitles, None to
+    leave mpv's own choice (nothing alike in this video)."""
+    if pick is None:
+        return None
+    if pick.off:
+        return "no"
+    if pick.lang is None and pick.title is None:
+        return tracks[pick.index].id if 0 <= pick.index < len(tracks) else None
+    lang = (pick.lang or "").casefold()
+    same_lang = [t for t in tracks if (t.lang or "").casefold() == lang]
+    for track in same_lang:
+        if track.title == pick.title:
+            return track.id
+    return same_lang[0].id if same_lang else None
+
+
+def pick_of(tracks: list[Track], track_id: int | None) -> Pick | None:
+    """What to remember of a track chosen by hand (None: an unknown track)."""
+    if track_id is None:
+        return Pick(off=True)
+    for index, track in enumerate(tracks):
+        if track.id == track_id:
+            return Pick(track.lang, track.title, index)
+    return None
 
 
 def libmpv_dirs() -> list[Path]:
@@ -198,6 +236,7 @@ class MpvSession:
         self._ended = False  # `ended` was called (it is called once)
         self._at_end = False  # `finished` was called for the current video
         self._terminated = False
+        self._picked = False  # the start's picks were applied to this video's tracks
         self._last_rect: Rect | None = start.rect
         options: dict[str, Any] = {
             "title": f"{start.title} — Nanar",
@@ -215,6 +254,7 @@ class MpvSession:
             "hwdec": "auto-safe",
             "stop_screensaver": "yes",
             "start": f"{start.start:.3f}",
+            "af": NIGHT_FILTER if start.night else "",
         }
         if start.length is not None:
             # A generated stream (the demo's) can't seek: mpv's cache can, about half a minute
@@ -242,6 +282,9 @@ class MpvSession:
             "fullscreen",
             "sub-delay",
             "sub-scale",
+            "af",
+            "chapter",
+            "chapters",
             "track-list",
             "eof-reached",
         ):
@@ -252,8 +295,11 @@ class MpvSession:
     def load(self, start: Start) -> None:
         self._start = start
         self._at_end = False
+        self._picked = False
         self._playback = Playback(
-            fullscreen=self._playback.fullscreen, volume=self._playback.volume
+            fullscreen=self._playback.fullscreen,
+            volume=self._playback.volume,
+            night=self._playback.night,
         )
         self._mpv["title"] = f"{start.title} — Nanar"
         # Options of this file only. At the end of the previous one, mpv paused on its last
@@ -296,6 +342,18 @@ class MpvSession:
             case "sub_scale":
                 m.sub_scale = max(0.3, min(3.0, float(value)))
                 message = f"Taille des sous-titres : {round(m.sub_scale * 100)} %"
+            case "night":
+                on = bool(value) if value is not None else not self._playback.night
+                m.af = NIGHT_FILTER if on else ""
+                message = "Mode nuit" if on else "Mode nuit désactivé"
+            case "chapter":
+                count = int(m.chapters or 0)
+                if count == 0:
+                    return
+                current = int(m.chapter or 0)
+                target = max(0, min(count - 1, current + int(value)))
+                m.chapter = target
+                message = f"Chapitre {target + 1} / {count}"
             case _:
                 raise ValueError(f"unknown player action {action!r}")
         if osd and message:
@@ -349,7 +407,7 @@ class MpvSession:
 
     def _on_message(self, *args: bytes | str) -> None:
         words = [a.decode() if isinstance(a, bytes) else a for a in args]
-        if words and words[0] in ("stop", "next", "previous"):
+        if words and words[0] in ("stop", "next", "previous", "cycle_audio", "cycle_sub"):
             self._callbacks.action(words[0])
 
     def _on_property(self, name: str, value: Any) -> None:
@@ -382,15 +440,33 @@ class MpvSession:
                 p.sub_delay = float(value or 0)
             case "sub-scale":
                 p.sub_scale = float(value or 1)
+            case "af":
+                p.night = bool(value)
+            case "chapter":
+                p.chapter = int(value) if value is not None and value >= 0 else None
+            case "chapters":
+                p.chapters = int(value or 0)
             case "track-list":
                 tracks = value or []
                 p.audio = [_track(t) for t in tracks if t.get("type") == "audio"]
                 p.subs = [_track(t) for t in tracks if t.get("type") == "sub"]
+                if not self._picked and p.audio:
+                    self._picked = True
+                    self._apply_picks(p)
             case "eof-reached":
                 if value:
                     self._reached_end()
                 return
         self._callbacks.changed(p)
+
+    def _apply_picks(self, p: Playback) -> None:
+        """Selects the tracks picked by hand in another video of the saga or series."""
+        audio = choose(p.audio, self._start.audio)
+        sub = choose(p.subs, self._start.sub)
+        if audio is not None:
+            self._mpv["aid"] = audio
+        if sub is not None:
+            self._mpv["sid"] = sub
 
     def _reached_end(self) -> None:
         if self._at_end or self._ended or self._terminated:

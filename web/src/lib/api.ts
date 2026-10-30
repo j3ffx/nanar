@@ -44,6 +44,8 @@ export interface Library {
   entries: { kind: 'video' | 'group'; id: string }[];
   /** "À suivre": videos left in the middle, and the next of a saga or a series. */
   continue: string[];
+  /** "Récemment ajoutés": entries with a video new in the folder, the newest first. */
+  recent: { kind: 'video' | 'group'; id: string }[];
 }
 
 export interface Track {
@@ -64,6 +66,9 @@ export interface Playing {
   muted: boolean;
   subDelay: number;
   subScale: number;
+  /** The chapter shown (from 0), and how many the video has (0: none). */
+  chapter: number | null;
+  chapters: number;
   audio: Track[];
   subs: Track[];
   hasNext: boolean;
@@ -78,6 +83,10 @@ export interface State {
   libraryVersion: number;
   playing: Playing | null;
   upNext: UpNext | null;
+  /** Night mode: loud scenes softer, for the rest of the evening. */
+  night: boolean;
+  /** Stops at the end of this video, or in `remaining` seconds. */
+  sleep: { kind: 'end' } | { kind: 'timer'; remaining: number } | null;
   /** What a phone looks at in the library; the TV page follows it when `seq` changes. */
   view: { path: string; focus: string | null; filter: Filter; seq: number };
   /** The Windows build asks once to add Nanar to the Start menu and the right-click menu. */
@@ -116,6 +125,10 @@ export const play = (videoId: string, start?: number) =>
 
 export const command = (action: string, value?: unknown) =>
   send('/api/command', { action, value: value ?? null });
+
+/** Marks a video watched or not, or takes it out of "À suivre". */
+export const mark = (videoId: string, action: 'watched' | 'unwatched' | 'dismiss') =>
+  send('/api/mark', { videoId, action });
 
 export const pair = (key: string) => send('/api/pair', { key });
 

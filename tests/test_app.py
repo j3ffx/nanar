@@ -337,3 +337,11 @@ def test_answering_the_menus_offer_hides_it(controller: Controller) -> None:
     assert tv.post("/api/integration", json={"install": False}).status_code == 204
     assert desktop.integrated == [False]
     assert tv.get("/api/state").json()["offerIntegration"] is False
+
+
+def test_marks_a_video_from_a_phone(client: TestClient) -> None:
+    film = first_film(client)
+    assert client.post("/api/mark", json={"videoId": film, "action": "watched"}).status_code == 204
+    assert client.get("/api/library").json()["videos"][film]["progress"]["watched"]
+    bad = client.post("/api/mark", json={"videoId": film, "action": "burn"})
+    assert bad.status_code == 422

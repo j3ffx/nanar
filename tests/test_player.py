@@ -7,7 +7,8 @@ import pytest
 
 from nanar import demo
 from nanar.config import Settings
-from nanar.player import MpvSession, Playback, Rect, Start
+from nanar.player import MpvSession, Playback, Rect, Start, Track, choose, pick_of
+from nanar.progress import Pick
 
 
 def libmpv_available() -> bool:
@@ -105,5 +106,37 @@ def test_the_demo_jumps_forward_and_back() -> None:
         recorder.wait(lambda p: p.position >= 19.5)
         session.command("seek", -10)
         recorder.wait(lambda p: 9 <= p.position < 15)
+    finally:
+        session.close()
+
+
+def test_picks_found_again_by_language_and_title_then_language_then_rank() -> None:
+    tracks = [
+        Track(1, "sub", "fre", "Forcés", False),
+        Track(2, "sub", "fre", "Complets", False),
+        Track(3, "sub", "eng", None, False),
+    ]
+    assert choose(tracks, Pick("fre", "Complets", 1)) == 2
+    assert choose(tracks, Pick("FRE", "SDH", 0)) == 1  # same language, another title
+    assert choose(tracks, Pick("spa", None, 0)) is None  # nothing alike: mpv's own choice
+    assert choose(tracks, Pick(off=True)) == "no"
+    assert choose(tracks, Pick(None, None, 2)) == 3  # no language, no title: its rank
+    assert choose(tracks, None) is None
+    assert pick_of(tracks, 2) == Pick("fre", "Complets", 1)
+    assert pick_of(tracks, None) == Pick(off=True)
+    assert pick_of(tracks, 9) is None
+
+
+def test_plays_with_the_tracks_picked_before_and_night_mode() -> None:
+    recorder = Recorder()
+    start = Start(demo.source(0, 60), "Démo", audio=Pick(index=1), night=True)
+    session = MpvSession(start, Settings(), recorder)
+    try:
+        recorder.wait(lambda p: [t.selected for t in p.audio] == [False, True])
+        recorder.wait(lambda p: p.night)
+        session.command("night", False)
+        recorder.wait(lambda p: not p.night)
+        session.command("chapter", 1)  # no chapters here: nothing happens
+        assert recorder.latest.chapters == 0
     finally:
         session.close()

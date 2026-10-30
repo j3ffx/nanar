@@ -21,6 +21,7 @@ const library = (videos: Video[]): Library => ({
   groups: { g: group },
   entries: [],
   continue: [],
+  recent: [],
 });
 
 const group: Group = { id: 'g', kind: 'series', title: 'S', videos: ['e1', 'e2', 'e3'] };

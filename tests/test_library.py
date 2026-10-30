@@ -1,7 +1,8 @@
+import time
 from pathlib import Path
 
 from nanar import demo
-from nanar.library import build, scan
+from nanar.library import build, recent, scan
 
 # Names as downloaded films come, with made-up titles.
 PATHS = [
@@ -110,3 +111,36 @@ def test_the_demo_library_has_sagas_series_and_films() -> None:
     lib = demo.library()
     assert {g.kind for g in lib.groups.values()} == {"saga", "series"}
     assert all(v.path.startswith("av://lavfi:") for v in lib.videos.values())
+
+
+def test_recently_added_shows_what_arrived_lately_newest_first() -> None:
+    day = 86400.0
+    now = 100 * day
+    library = build(
+        "/films",
+        ["Old 1990.mkv", "New 2001.mkv", "Saga/Saga 1990.mkv", "Saga/Saga 2 1992.mkv"],
+        {
+            "Old 1990.mkv": now - 90 * day,
+            "New 2001.mkv": now - 3 * day,
+            "Saga/Saga 1990.mkv": now - 80 * day,
+            "Saga/Saga 2 1992.mkv": now - 1 * day,
+        },
+    )
+    saga = next(iter(library.groups))
+    new = next(v.id for v in library.videos.values() if v.title == "New")
+    assert recent(library, now) == [("group", saga), ("video", new)]
+
+
+def test_recently_added_says_nothing_when_everything_is_new() -> None:
+    library = build(
+        "/films", ["A 1990.mkv", "B 2001.mkv"], {"A 1990.mkv": 10.0, "B 2001.mkv": 20.0}
+    )
+    assert recent(library, 30.0) == []
+
+
+def test_scan_knows_when_each_file_arrived(tmp_path: Path) -> None:
+    (tmp_path / "Film 2001.mkv").write_bytes(b"")
+    library = scan(tmp_path)
+    (video,) = library.videos.values()
+    assert video.added is not None
+    assert abs(video.added - time.time()) < 60

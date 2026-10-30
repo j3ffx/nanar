@@ -34,6 +34,11 @@ class CommandBody(BaseModel):
     value: Any = None
 
 
+class MarkBody(BaseModel):
+    videoId: str
+    action: Literal["watched", "unwatched", "dismiss"]
+
+
 class ViewFilter(BaseModel):
     query: str = Field(default="", max_length=100)  # words searched in the titles
     kind: Literal["all", "films", "series"] = "all"
@@ -139,6 +144,10 @@ def create_app(
         await asyncio.to_thread(
             controller.command, body.action, body.value, osd=not _caller(request).local
         )
+
+    @app.post("/api/mark", status_code=204)
+    async def mark(body: MarkBody) -> None:
+        await asyncio.to_thread(controller.mark, body.videoId, body.action)
 
     @app.post("/api/view", status_code=204)
     async def view(body: ViewBody) -> None:

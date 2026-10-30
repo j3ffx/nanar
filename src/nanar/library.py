@@ -9,7 +9,9 @@ Everything else is a film on its own. Nothing is fetched from the Internet.
 """
 
 import hashlib
+import os
 import re
+import sys
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -50,6 +52,9 @@ _SITE = re.compile(r"[\[(][^\])]*(www\.|\.com|\.org|\.net|torrent)[^\])]*[\])]",
 Kind = Literal["movie", "episode"]
 GroupKind = Literal["saga", "series"]
 
+RECENT_DAYS = 30  # "Récemment ajoutés": what arrived in the folder this last month
+RECENT_MAX = 12
+
 
 @dataclass
 class Video:
@@ -62,6 +67,7 @@ class Video:
     episode: int | None = None
     episode_title: str | None = None
     group: str | None = None
+    added: float | None = None  # when the file arrived in the folder (seconds since 1970)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -121,23 +127,56 @@ class Library:
 
 def scan(root: Path) -> Library:
     """Reads every video under `root` (hidden folders skipped) into a library."""
-    paths = sorted(
-        p.relative_to(root).as_posix()
-        for p in root.rglob("*")
-        if p.suffix.lower() in VIDEO_EXTENSIONS
-        and p.is_file()
-        and not any(part.startswith(".") for part in p.relative_to(root).parts)
-    )
-    return build(str(root), paths)
+    added: dict[str, float] = {}
+    for p in root.rglob("*"):
+        relative = p.relative_to(root)
+        if p.suffix.lower() not in VIDEO_EXTENSIONS or any(
+            part.startswith(".") for part in relative.parts
+        ):
+            continue
+        try:
+            if p.is_file():
+                added[relative.as_posix()] = _arrival(p.stat())
+        except OSError:  # gone since, or unreadable
+            continue
+    return build(str(root), sorted(added), added)
 
 
-def build(root: str, paths: Iterable[str]) -> Library:
-    """Builds a library from relative paths (separate from `scan` so that tests need no files)."""
+def _arrival(stat: os.stat_result) -> float:
+    """When a file arrived here: a copy keeps the original's modification time but is created
+    anew (Windows, macOS), a download is written until it is complete."""
+    created = getattr(stat, "st_birthtime", None)
+    if created is None and sys.platform == "win32":
+        created = stat.st_ctime  # creation time on Windows before Python 3.12
+    return max(stat.st_mtime, created or 0.0)
+
+
+def recent(library: Library, now: float) -> list[tuple[Literal["video", "group"], str]]:
+    """The top-level entries with a video added in the last month, the newest first. None when
+    everything is new (a folder opened for the first time, a disk just copied): the row would
+    only repeat the whole library."""
+    newest: dict[tuple[Literal["video", "group"], str], float] = {}
+    for video in library.videos.values():
+        if video.added is None or now - video.added > RECENT_DAYS * 86400:
+            continue
+        key: tuple[Literal["video", "group"], str] = (
+            ("group", video.group) if video.group else ("video", video.id)
+        )
+        newest[key] = max(newest.get(key, 0.0), video.added)
+    if len(newest) == len(library.entries()):
+        return []
+    return sorted(newest, key=lambda k: newest[k], reverse=True)[:RECENT_MAX]
+
+
+def build(root: str, paths: Iterable[str], added: dict[str, float] | None = None) -> Library:
+    """Builds a library from relative paths (separate from `scan` so that tests need no files),
+    and when each file arrived."""
     library = Library(root=root)
     by_folder: dict[str, list[Video]] = {}
     series: dict[str, list[Video]] = {}
     for path in paths:
         video = _read(path)
+        video.added = (added or {}).get(path)
         library.videos[video.id] = video
         if video.kind == "episode":
             series.setdefault(_fold(video.title), []).append(video)

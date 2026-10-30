@@ -9,7 +9,9 @@ return. So callbacks never wait: what they report runs on the controller's worke
 
 import contextlib
 import copy
+import dataclasses
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,8 +19,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from nanar import demo
 from nanar.config import Settings
-from nanar.library import Library, Video
-from nanar.player import Playback, Rect, Session, SessionFactory, Start
+from nanar.library import Library, Video, recent
+from nanar.player import Playback, Rect, Session, SessionFactory, Start, pick_of
 from nanar.progress import Progress, to_continue
 
 if TYPE_CHECKING:
@@ -28,12 +30,26 @@ if TYPE_CHECKING:
 Listener = Callable[[dict[str, Any]], None]
 
 PLAYER_ACTIONS = frozenset(
-    {"pause", "seek", "seek_to", "volume", "mute", "audio", "sub", "sub_delay", "sub_scale"}
+    {
+        "pause",
+        "seek",
+        "seek_to",
+        "volume",
+        "mute",
+        "audio",
+        "sub",
+        "sub_delay",
+        "sub_scale",
+        "chapter",
+    }
 )
 UP_NEXT_SECONDS = 10  # the countdown before the next episode
 TICK = 1.0  # one second of that countdown (shorter in tests)
 SAVE_EVERY = 10.0  # seconds of playback between two saves of where a video is
 NO_FILTER: dict[str, Any] = {"query": "", "kind": "all", "unwatched": False}
+MINUTE = 60.0  # one minute of the sleep timer (shorter in tests)
+SLEEP_WARNING = 60.0  # seconds of notice on screen before the sleep timer stops the video
+SLEEP_MAX_MINUTES = 240
 
 
 class WindowHost(Protocol):
@@ -108,6 +124,11 @@ class Controller:
         self._countdown: threading.Timer | None = None
         self._view: dict[str, Any] = {"path": "/", "focus": None, "filter": NO_FILTER, "seq": 0}
         self._offer_integration = False
+        self._night = False  # for this run: a quieter evening is not every evening
+        self._sleep: str | None = None  # "end" (of this video) or "timer"
+        self._sleep_at = 0.0  # when the timer stops the video (time.monotonic)
+        self._sleep_timer: threading.Timer | None = None
+        self._sleep_seq = 0  # tells a cancelled timer's late call from the current one
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -142,6 +163,8 @@ class Controller:
                     "muted": p.muted,
                     "subDelay": p.sub_delay,
                     "subScale": p.sub_scale,
+                    "chapter": p.chapter,
+                    "chapters": p.chapters,
                     "audio": [t.to_json() for t in p.audio],
                     "subs": [t.to_json() for t in p.subs],
                     "hasNext": self.library.neighbour(self._video.id, 1) is not None,
@@ -150,6 +173,12 @@ class Controller:
             up_next = None
             if self._up_next is not None:
                 up_next = {"video": self._up_next.to_json(), "seconds": self._up_next_seconds}
+            sleep: dict[str, Any] | None = None
+            if self._sleep == "end":
+                sleep = {"kind": "end"}
+            elif self._sleep == "timer":
+                remaining = max(0, round(self._sleep_at - time.monotonic()))
+                sleep = {"kind": "timer", "remaining": remaining}
             return {
                 "folder": self.library.root,
                 "demo": self._demo,
@@ -158,6 +187,8 @@ class Controller:
                 "libraryVersion": self._library_version,
                 "playing": playing,
                 "upNext": up_next,
+                "night": self._night,
+                "sleep": sleep,
                 "view": dict(self._view),
                 "offerIntegration": self._offer_integration,
             }
@@ -182,6 +213,11 @@ class Controller:
                     else None
                 )
             data["continue"] = to_continue(self.library, saved)
+            data["recent"] = [
+                {"kind": kind, "id": ident}
+                for kind, ident in recent(self.library, time.time())
+                if kind == "group" or not _watched(saved, self.library.videos[ident].path)
+            ]
             return data
 
     def thumbnail(self, kind: str, ident: str) -> Path | None:
@@ -268,6 +304,7 @@ class Controller:
                 start = entry.resume_at() if entry else 0.0
             self._video = video
             self._saved_at = start
+            picks = self.progress.picks(self.library.root, _owner(video))
             begin = Start(
                 source=self._source_of(video),
                 title=video.title,
@@ -275,6 +312,9 @@ class Controller:
                 rect=None,
                 fullscreen=self.settings.fullscreen,
                 length=float(demo.SECONDS) if "://" in video.path else None,
+                audio=picks.get("audio"),
+                sub=picks.get("sub"),
+                night=self._night,
             )
             if self._session is not None:
                 # The same window: no flicker between two episodes.
@@ -285,14 +325,7 @@ class Controller:
                 self._generation += 1
                 self._playback = Playback(fullscreen=self.settings.fullscreen)
                 self._session = self._sessions(
-                    Start(
-                        begin.source,
-                        begin.title,
-                        begin.start,
-                        rect,
-                        begin.fullscreen,
-                        begin.length,
-                    ),
+                    dataclasses.replace(begin, rect=rect),
                     self.settings,
                     _SessionCallbacks(self, self._generation),
                 )
@@ -308,6 +341,12 @@ class Controller:
             self.skip(1 if action == "next" else -1)
         elif action == "fullscreen":
             self.set_fullscreen(None if value is None else bool(value))
+        elif action == "night":
+            self.set_night(None if value is None else bool(value), osd=osd)
+        elif action == "sleep":
+            self.set_sleep(value)
+        elif action in ("cycle_audio", "cycle_sub"):
+            self._cycle("audio" if action == "cycle_audio" else "sub")
         elif action in PLAYER_ACTIONS:
             with self._lock:
                 if self._session is None:
@@ -320,8 +359,114 @@ class Controller:
                     self._session.command(action, value, osd=osd)
                 except (TypeError, ValueError) as error:
                     raise CommandError("bad_value") from error
+                if action in ("audio", "sub"):
+                    self._remember(action, value)
         else:
             raise CommandError("unknown_action")
+
+    def _remember(self, kind: str, value: Any) -> None:
+        """Keeps a track chosen by hand for the rest of the saga or series."""
+        if self._video is None or self._playback is None:
+            return
+        tracks = self._playback.audio if kind == "audio" else self._playback.subs
+        pick = pick_of(tracks, None if value is None else int(value))
+        if pick is not None and not (kind == "audio" and pick.off):
+            self.progress.pick(self.library.root, _owner(self._video), kind, pick)
+
+    def _cycle(self, kind: str) -> None:
+        """The next audio track, or subtitles (then none): mpv's B and V keys."""
+        with self._lock:
+            if self._playback is None:
+                raise CommandError("nothing_playing")
+            tracks = self._playback.audio if kind == "audio" else self._playback.subs
+            choices: list[int | None] = [t.id for t in tracks]
+            if kind == "sub":
+                choices.append(None)
+            if not choices:
+                return
+            current = next((t.id for t in tracks if t.selected), None)
+            index = choices.index(current) if current in choices else -1
+            self.command(kind, choices[(index + 1) % len(choices)], osd=True)
+
+    def set_night(self, night: bool | None, *, osd: bool = False) -> None:
+        """Night mode: loud scenes softer, quiet lines louder. It stays on for the next videos,
+        until Nanar closes."""
+        with self._lock:
+            self._night = not self._night if night is None else night
+            if self._session is not None:
+                self._session.command("night", self._night, osd=osd)
+        self._announce()
+
+    def set_sleep(self, value: Any) -> None:
+        """Stops the video later: at its end ("end"), or in `value` minutes; None cancels."""
+        with self._lock:
+            if value is not None and self._session is None:
+                raise CommandError("nothing_playing")
+            if value is not None and value != "end":
+                if isinstance(value, bool) or not isinstance(value, int | float):
+                    raise CommandError("bad_value")
+                if not 1 <= value <= SLEEP_MAX_MINUTES:
+                    raise CommandError("bad_value")
+            self._cancel_sleep()
+            if value == "end":
+                self._sleep = "end"
+            elif value is not None:
+                seconds = float(value) * MINUTE
+                self._sleep = "timer"
+                self._sleep_at = time.monotonic() + seconds
+                self._sleep_timer_in(max(0.0, seconds - SLEEP_WARNING), self._sleep_warn)
+        self._announce()
+
+    def _sleep_timer_in(self, seconds: float, then: Callable[[int], None]) -> None:
+        seq = self._sleep_seq
+        timer = threading.Timer(seconds, lambda: self._worker.submit(then, seq))
+        timer.daemon = True
+        self._sleep_timer = timer
+        timer.start()
+
+    def _sleep_warn(self, seq: int) -> None:
+        with self._lock:
+            if seq != self._sleep_seq or self._sleep != "timer":
+                return
+            if self._session is not None:
+                with contextlib.suppress(Exception):
+                    self._session.message("Nanar s’arrête dans une minute.", 5)
+            self._sleep_timer_in(max(0.0, self._sleep_at - time.monotonic()), self._sleep_now)
+
+    def _sleep_now(self, seq: int) -> None:
+        with self._lock:
+            if seq != self._sleep_seq or self._sleep != "timer":
+                return
+        self.stop()
+
+    def _cancel_sleep(self) -> None:
+        self._sleep_seq += 1
+        if self._sleep_timer is not None:
+            self._sleep_timer.cancel()
+            self._sleep_timer = None
+        self._sleep = None
+
+    def mark(self, video_id: str, action: str) -> None:
+        """From a phone: "watched" (seen elsewhere), "unwatched" (to see again), "dismiss" (out
+        of "À suivre")."""
+        with self._lock:
+            video = self.library.videos.get(video_id)
+            if video is None:
+                raise CommandError("unknown_video")
+            root = self.library.root
+            if action == "dismiss":
+                # A saga's or a series' place in the row comes from its latest video played.
+                group = self.library.groups.get(video.group) if video.group else None
+                paths = [self.library.videos[i].path for i in group.videos] if group else []
+                saved = self.progress.of_root(root)
+                played = [(saved[p].updated, p) for p in paths if p in saved]
+                self.progress.hide(root, max(played)[1] if played else video.path)
+            elif action in ("watched", "unwatched"):
+                self.progress.mark(root, video.path, watched=action == "watched")
+            else:
+                raise CommandError("bad_value")
+            self._library_version += 1
+        self._announce()
 
     def stop(self) -> None:
         with self._lock:
@@ -357,6 +502,7 @@ class Controller:
     def shutdown(self) -> None:
         with self._lock:
             self._cancel_up_next()
+            self._cancel_sleep()
             self._save_current(finished=False)
             self._close_session()
         self._worker.shutdown(wait=False)
@@ -395,7 +541,7 @@ class Controller:
                 self._save_current(finished=True)
                 self._library_version += 1
                 following = self.library.neighbour(self._video.id, 1)
-                if following is None:
+                if following is None or self._sleep == "end":
                     rect = self._close_session()
                     self._back_to_nanar(rect)
                 else:
@@ -489,6 +635,7 @@ class Controller:
         return rect
 
     def _back_to_nanar(self, rect: Rect | None) -> None:
+        self._cancel_sleep()
         self._video = None
         self._playback = None
         self._library_version += 1  # what was watched shows in the library
@@ -502,6 +649,16 @@ class Controller:
     def _save_settings(self) -> None:
         if self._settings_path is not None:
             self.settings.save(self._settings_path)
+
+
+def _owner(video: Video) -> str:
+    """Whose tracks a video plays with: its saga or series, or the film itself."""
+    return video.group or video.path
+
+
+def _watched(saved: dict[str, Any], path: str) -> bool:
+    entry = saved.get(path)
+    return bool(entry and entry.watched)
 
 
 def _label(video: Video) -> str:

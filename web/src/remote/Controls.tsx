@@ -107,7 +107,7 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
       {tab === 'library' ? (
         library(notify)
       ) : playing ? (
-        <NowPlaying playing={playing} send={send} />
+        <NowPlaying playing={playing} state={state!} send={send} />
       ) : (
         <section className={styles.idle}>
           <p className={styles.lead}>{state ? 'Rien à l’écran.' : 'Connexion à Nanar…'}</p>
@@ -161,9 +161,11 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
 
 type Send = (action: string, value?: unknown) => void;
 
-function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
-  const [sheet, setSheet] = useState<'audio' | 'subs' | null>(null);
+function NowPlaying({ playing, state, send }: { playing: Playing; state: State; send: Send }) {
+  const [sheet, setSheet] = useState<'audio' | 'subs' | 'sleep' | null>(null);
   const { video } = playing;
+  const end = video.kind === 'episode' ? 'À la fin de l’épisode' : 'À la fin du film';
+  const endShort = video.kind === 'episode' ? 'Fin d’épisode' : 'Fin du film';
 
   return (
     <>
@@ -213,6 +215,20 @@ function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
         </Pill>
       </section>
 
+      {playing.chapters > 1 && (
+        <section className={styles.row} aria-label="Chapitres">
+          <Pill onClick={() => send('chapter', -1)}>
+            <Icon.Previous /> Chapitre
+          </Pill>
+          <span className={styles.chapter}>
+            {(playing.chapter ?? 0) + 1} / {playing.chapters}
+          </span>
+          <Pill onClick={() => send('chapter', 1)}>
+            Chapitre <Icon.Next />
+          </Pill>
+        </section>
+      )}
+
       <VolumeBar volume={playing.volume} muted={playing.muted} send={send} />
 
       <section className={styles.row} aria-label="Pistes">
@@ -228,6 +244,45 @@ function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
         </Pill>
       </section>
 
+      <section className={styles.row} aria-label="Soirée">
+        <Pill onClick={() => send('night', !state.night)} pressed={state.night} wide>
+          <Icon.Moon />
+          <span className={styles.pillText}>Mode nuit</span>
+        </Pill>
+        <Pill onClick={() => setSheet('sleep')} pressed={state.sleep !== null} wide>
+          <Icon.Timer />
+          <span className={styles.pillText}>{sleepLabel(state.sleep, endShort)}</span>
+        </Pill>
+      </section>
+
+      <Sheet title="Arrêter la lecture" open={sheet === 'sleep'} onClose={() => setSheet(null)}>
+        <ul className={styles.tracks}>
+          {SLEEP_CHOICES(end).map(([value, label]) => {
+            const chosen =
+              value === null
+                ? state.sleep === null
+                : value === 'end'
+                  ? state.sleep?.kind === 'end'
+                  : false;
+            return (
+              <li key={String(value)}>
+                <button
+                  type="button"
+                  className={styles.track}
+                  aria-pressed={chosen}
+                  onClick={() => {
+                    send('sleep', value);
+                    setSheet(null);
+                  }}
+                >
+                  {label}
+                  {chosen && <Icon.Check />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </Sheet>
       <Sheet title="Audio" open={sheet === 'audio'} onClose={() => setSheet(null)}>
         <TrackList tracks={playing.audio} onPick={(id) => send('audio', id)} />
       </Sheet>
@@ -251,6 +306,22 @@ function NowPlaying({ playing, send }: { playing: Playing; send: Send }) {
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;
+
+const SLEEP_CHOICES = (end: string): [string | number | null, string][] => [
+  [null, 'Jamais'],
+  ['end', end],
+  [15, 'Dans 15 minutes'],
+  [30, 'Dans 30 minutes'],
+  [60, 'Dans 1 heure'],
+  [90, 'Dans 1 h 30'],
+];
+
+/** What the sleep timer's button says: off, at the end, or the minutes left. */
+function sleepLabel(sleep: State['sleep'], end: string): string {
+  if (sleep === null) return 'Minuterie';
+  if (sleep.kind === 'end') return end;
+  return `${Math.max(1, Math.ceil(sleep.remaining / 60))} min`;
+}
 
 function selectedLabel(tracks: Track[]): string | null {
   return tracks.find((t) => t.selected)?.label ?? null;
@@ -474,11 +545,18 @@ function Round(props: {
   );
 }
 
-function Pill(props: { onClick: () => void; children: ReactNode; tone?: 'stop'; wide?: boolean }) {
+function Pill(props: {
+  onClick: () => void;
+  children: ReactNode;
+  tone?: 'stop';
+  wide?: boolean;
+  pressed?: boolean;
+}) {
   return (
     <button
       type="button"
       className={styles.pill}
+      aria-pressed={props.pressed}
       data-tone={props.tone}
       data-wide={props.wide || undefined}
       onClick={props.onClick}

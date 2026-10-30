@@ -1,7 +1,8 @@
+import sqlite3
 from pathlib import Path
 
 from nanar.library import build
-from nanar.progress import Entry, Progress, to_continue
+from nanar.progress import Entry, Pick, Progress, to_continue
 
 
 def test_keeps_where_a_video_was_left_across_runs(tmp_path: Path) -> None:
@@ -102,3 +103,54 @@ def test_continue_skips_what_was_already_watched_and_ends_with_the_saga() -> Non
     assert to_continue(SHELF, saved) == [ident("Saga/Saga 3 1995.mkv")]
     saved["Saga/Saga 3 1995.mkv"] = done(3.0)
     assert to_continue(SHELF, saved) == []
+
+
+def test_marks_by_hand_and_unmarks() -> None:
+    progress = Progress(None)
+    progress.save("/films", "A.mkv", 1200.0, 6000.0, finished=False)
+    progress.mark("/films", "A.mkv", watched=True)
+    entry = progress.get("/films", "A.mkv")
+    assert entry is not None
+    assert entry.watched
+    assert entry.position == 0.0
+    assert entry.duration == 6000.0
+    progress.mark("/films", "A.mkv", watched=False)
+    assert progress.get("/films", "A.mkv") is None  # as if never played
+
+
+def test_a_hidden_video_leaves_continue_until_played_again() -> None:
+    library = build("/films", ["A 2001.mkv", "Saga/Saga 1990.mkv", "Saga/Saga 2 1992.mkv"])
+    progress = Progress(None)
+    progress.save("/films", "A 2001.mkv", 1200.0, 6000.0, finished=False)
+    progress.save("/films", "Saga/Saga 1990.mkv", 0.0, 6000.0, finished=True)
+    assert len(to_continue(library, progress.of_root("/films"))) == 2
+    progress.hide("/films", "A 2001.mkv")
+    progress.hide("/films", "Saga/Saga 1990.mkv")
+    assert to_continue(library, progress.of_root("/films")) == []
+    progress.save("/films", "A 2001.mkv", 1300.0, 6000.0, finished=False)
+    assert len(to_continue(library, progress.of_root("/films"))) == 1
+
+
+def test_remembers_the_tracks_picked_for_a_series(tmp_path: Path) -> None:
+    db = tmp_path / "progress.db"
+    Progress(db).pick("/films", "series1", "audio", Pick("en", "VO", 1))
+    Progress(db).pick("/films", "series1", "sub", Pick(off=True))
+    assert Progress(db).picks("/films", "series1") == {
+        "audio": Pick("en", "VO", 1),
+        "sub": Pick(off=True),
+    }
+    assert Progress(db).picks("/films", "other") == {}
+
+
+def test_opens_a_database_of_an_earlier_version(tmp_path: Path) -> None:
+    db = tmp_path / "progress.db"
+    with sqlite3.connect(db) as old:
+        old.execute(
+            "CREATE TABLE progress (root TEXT NOT NULL, path TEXT NOT NULL,"
+            " position REAL NOT NULL, duration REAL, watched INTEGER NOT NULL,"
+            " updated REAL NOT NULL, PRIMARY KEY (root, path))"
+        )
+        old.execute("INSERT INTO progress VALUES ('/films', 'A.mkv', 1200, 6000, 0, 1)")
+    old.close()
+    entry = Progress(db).get("/films", "A.mkv")
+    assert entry == Entry(1200.0, 6000.0, False, 1.0, hidden=False)
