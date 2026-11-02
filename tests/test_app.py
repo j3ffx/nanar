@@ -430,3 +430,32 @@ def test_only_this_machine_installs_an_update(controller: Controller) -> None:
     assert controller.settings.check_updates
     assert tv.post("/api/update", json={}).status_code == 204
     assert desktop.updated
+
+
+def test_a_network_path_in_the_address_never_reaches_the_file_system(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    touched: list[str] = []
+    real = Path.resolve
+
+    def resolve(self: Path, strict: bool = False) -> Path:
+        touched.append(str(self))
+        return real(self, strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    client.get("/%5C%5C192.0.2.1%5Cshare%5Cx.txt")
+    assert not [p for p in touched if "192.0.2.1" in p]
+
+
+def test_pages_refuse_another_sites_frame(client: TestClient) -> None:
+    headers = client.get("/api/health").headers
+    assert headers["content-security-policy"] == "frame-ancestors 'none'"
+    assert headers["x-content-type-options"] == "nosniff"
+
+
+def test_a_websocket_must_come_from_the_same_port(client: TestClient) -> None:
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect("/api/live", headers={"origin": "http://127.0.0.1:9999"}),
+    ):
+        pass

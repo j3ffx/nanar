@@ -136,7 +136,9 @@ def create_app(
     hotspot: WindowsHotspot | NoHotspot | None = None,
 ) -> FastAPI:
     wifi = hotspot or NoHotspot()
-    app = FastAPI(title="Nanar", version=__version__, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="Nanar", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
+    )
     app.add_middleware(AccessMiddleware, key=key)
     phones: set[WebSocket] = set()
 
@@ -383,16 +385,22 @@ def create_app(
         )
 
     pages = static_dir()
+    # Listed once: a path from a request never reaches the file system (on Windows, a
+    # "\\host\share" path there would make the PC connect to that host).
+    assets = (
+        {p.relative_to(pages).as_posix(): p for p in pages.rglob("*") if p.is_file()}
+        if pages.is_dir()
+        else {}
+    )
 
     @app.get("/{path:path}", include_in_schema=False, response_model=None)
     async def page(path: str) -> FileResponse | JSONResponse:
         if path.startswith("api/"):
             return JSONResponse({"code": "not_found"}, status_code=404)
-        asset = (pages / path).resolve()
-        if path and asset.is_file() and asset.is_relative_to(pages.resolve()):
+        if asset := assets.get(path):
             return FileResponse(asset)
-        index = pages / "index.html"
-        if not index.is_file():
+        index = assets.get("index.html")
+        if index is None:
             return JSONResponse({"code": "ui_not_built"}, status_code=503)
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 

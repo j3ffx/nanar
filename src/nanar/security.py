@@ -8,8 +8,9 @@
   `GET /api/health` and `POST /api/pair`.
 
 Whoever they are, a request that changes state must carry a JSON body: another website open in a
-browser can't send one without a CORS preflight, and no CORS header is ever granted. The cookie is
-`SameSite=Strict`, and a WebSocket must come from the page's own origin.
+browser can't send one without a CORS preflight, and only `/api/health` grants a CORS header. The
+cookie is `SameSite=Strict`, a WebSocket must come from the page's own origin, and no page shows
+in another site's frame.
 """
 
 import hmac
@@ -18,12 +19,17 @@ import json
 from dataclasses import dataclass
 
 from starlette.datastructures import Headers
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 COOKIE = "nanar_key"
 LOOPBACK_NAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 OPEN_API = frozenset({("GET", "/api/health"), ("POST", "/api/pair")})
+DEV_ORIGINS = frozenset({"localhost:5173", "127.0.0.1:5173"})
+HARDENING = (
+    (b"content-security-policy", b"frame-ancestors 'none'"),
+    (b"x-content-type-options", b"nosniff"),
+)
 
 
 @dataclass(frozen=True)
@@ -85,7 +91,15 @@ class AccessMiddleware:
         scope.setdefault("state", {})["caller"] = caller
         problem = _problem(scope, Headers(scope=scope), caller)
         if problem is None:
-            await self.app(scope, receive, send)
+
+            async def hardened(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    # No page of Nanar in another site's frame: there, its clicks would count
+                    # as this machine's.
+                    message["headers"] = [*message.get("headers", []), *HARDENING]
+                await send(message)
+
+            await self.app(scope, receive, hardened)
             return
         if scope["type"] == "websocket":
             await send({"type": "websocket.close", "code": 1008})
@@ -105,15 +119,19 @@ class AccessMiddleware:
         await send({"type": "http.response.body", "body": body})
 
 
+def _same_origin(origin: str, host: str) -> bool:
+    """A page's own origin, port included; or the pages served by Vite, in development."""
+    there = origin.split("://")[-1]
+    return there == host or there in DEV_ORIGINS
+
+
 def _problem(scope: Scope, headers: Headers, caller: Caller) -> tuple[int, str] | None:
     path: str = scope["path"]
     if scope["type"] == "websocket":
         if not (caller.local or caller.paired):
             return 401, "pairing_required"
         origin = headers.get("origin")
-        if origin is not None and hostname_of(origin.split("://")[-1]) != hostname_of(
-            headers.get("host", "")
-        ):
+        if origin is not None and not _same_origin(origin, headers.get("host", "")):
             return 403, "forbidden_origin"
         return None
     method: str = scope["method"]
