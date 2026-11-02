@@ -10,6 +10,7 @@ return. So callbacks never wait: what they report runs on the controller's worke
 import contextlib
 import copy
 import dataclasses
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from nanar.updates import Updates
 
 Listener = Callable[[dict[str, Any]], None]
+log = logging.getLogger(__name__)
 
 PLAYER_ACTIONS = frozenset(
     {
@@ -473,6 +475,9 @@ class Controller:
                     self._session.command(action, value, osd=osd)
                 except (TypeError, ValueError) as error:
                     raise CommandError("bad_value") from error
+                except Exception as error:  # mpv refuses while a file opens, or as it closes
+                    log.info("mpv refused %s: %s", action, error)
+                    raise CommandError("not_ready") from error
                 if action in ("audio", "sub"):
                     self._remember(action, value)
         else:

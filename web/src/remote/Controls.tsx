@@ -20,12 +20,19 @@ const MESSAGES: Record<string, string> = {
   nothing_playing: 'Rien ne passe en ce moment.',
   no_neighbour: 'Pas d’autre épisode de ce côté.',
   bad_value: 'Nanar n’a pas compris.',
+  not_ready: 'Un instant, la vidéo se charge.',
   no_subtitles: 'Pas de sous-titres français trouvés pour cette vidéo.',
   quota_reached: 'OpenSubtitles refuse pour aujourd’hui : réessaie demain.',
   bad_key: 'OpenSubtitles refuse la clé (voir les réglages sur la télé).',
   offline: 'Le PC n’arrive pas à joindre OpenSubtitles.',
   online_off: 'Les sous-titres en ligne ne sont pas activés.',
 };
+
+/** What to tell the user: silence is not the same as a refusal. */
+function sentence(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'Nanar ne répond pas : vérifie le Wi-Fi du téléphone.';
+  return MESSAGES[error.code] ?? 'Ça n’a pas marché. Réessaie.';
+}
 
 export type Tab = 'remote' | 'library';
 
@@ -57,8 +64,7 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
           onUnpaired();
           return;
         }
-        const code = error instanceof ApiError ? error.code : '';
-        notify(MESSAGES[code] ?? 'Nanar ne répond pas.');
+        notify(sentence(error));
       });
     },
     [onUnpaired, notify],
@@ -184,8 +190,7 @@ function NowPlaying({
     findSubtitles()
       .then(() => setSheet(null))
       .catch((error: unknown) => {
-        const code = error instanceof ApiError ? error.code : '';
-        notify(MESSAGES[code] ?? 'Nanar ne répond pas.');
+        notify(sentence(error));
       })
       .finally(() => setSearching(false));
   };

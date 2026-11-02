@@ -108,7 +108,13 @@ class Announcer:
 
     def _refresh(self) -> None:
         addresses = self._addresses()
+        if self._zeroconf is None and not self._stop.is_set():  # the last new start failed
+            self._restart()
+            return
         if not addresses or addresses == self._announced or self._zeroconf is None:
+            return
+        if self._announced:  # another network: its sockets were opened on the old one
+            self._restart()
             return
         info = ServiceInfo(
             SERVICE,
@@ -126,11 +132,12 @@ class Announcer:
         self._announced = addresses
 
     def _check(self) -> None:
-        """Asks for the name on each network it is announced on; announces it afresh when one
-        of them has stopped answering."""
+        """Asks for the name on the networks it is announced on; announces it afresh when
+        none answers any more. Closing tells every network the name is gone, for a moment: a
+        network that still answers is not worth that."""
         if not self.active:
             return
-        if all(self._probe(address) for address in self._announced):
+        if any(self._probe(address) for address in self._announced):
             self._unanswered = 0
             return
         self._unanswered += 1
@@ -138,10 +145,17 @@ class Announcer:
             return
         log.warning("%s no longer answered: announcing it afresh", HOST)
         self._unanswered = 0
+        self._restart()
+
+    def _restart(self) -> None:
         deaf, self._zeroconf = self._zeroconf, None
         if deaf is not None:
             deaf.close()
         self._info = None
         self._announced = []
-        self._zeroconf = self._make()
+        try:
+            self._zeroconf = self._make()
+        except OSError as error:  # tried again at the next round
+            log.warning("mDNS unavailable, no %s: %s", HOST, error)
+            return
         self._refresh()

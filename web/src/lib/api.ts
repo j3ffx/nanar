@@ -122,11 +122,25 @@ export class ApiError extends Error {
   }
 }
 
+const COMMAND_MS = 4000; // a command unanswered this long on the live connection
+const SILENCE_MS = 25_000; // Nanar says something every 10 s: this long without it, it's gone
+const CONNECTING_MS = 8000;
+
+let liveSocket: WebSocket | null = null;
+let lastCommand = 0;
+const waiting = new Map<number, (code: string | null) => void>();
+
 async function send(path: string, body: unknown): Promise<void> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+  const post = () =>
+    fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  // A failed lookup of nanar.local is often over a moment later.
+  const response = await post().catch(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return post();
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { code?: string };
@@ -138,8 +152,30 @@ async function send(path: string, body: unknown): Promise<void> {
 export const play = (videoId: string, start?: number) =>
   send('/api/play', { videoId, start: start ?? null });
 
-export const command = (action: string, value?: unknown) =>
-  send('/api/command', { action, value: value ?? null });
+/**
+ * Runs a player action. Through the live connection when it is open: it needs no new connection,
+ * so no lookup of nanar.local, which a Wi-Fi may fail while the connection itself works. Once
+ * sent it isn't sent again, as "pause" twice would do nothing.
+ */
+export function command(action: string, value?: unknown): Promise<void> {
+  const socket = liveSocket;
+  if (socket?.readyState !== WebSocket.OPEN) {
+    return send('/api/command', { action, value: value ?? null });
+  }
+  return new Promise((resolve, reject) => {
+    const id = ++lastCommand;
+    const timer = setTimeout(() => {
+      waiting.delete(id);
+      reject(new Error('no answer'));
+    }, COMMAND_MS);
+    waiting.set(id, (code) => {
+      clearTimeout(timer);
+      if (code) reject(new ApiError(code));
+      else resolve();
+    });
+    socket.send(JSON.stringify({ type: 'command', id, action, value: value ?? null }));
+  });
+}
 
 /** Marks a video watched or not, or takes it out of "À suivre". */
 export const mark = (videoId: string, action: 'watched' | 'unwatched' | 'dismiss') =>
@@ -230,6 +266,11 @@ export function useLibrary(version?: number): Library | null {
   return library;
 }
 
+type LiveMessage =
+  | { type: 'state'; state: State }
+  | { type: 'tick' }
+  | { type: 'result'; id: number; code: string | null };
+
 export interface Live {
   state: State | null;
   /** False while the connection is down (Nanar closed, the phone off the network). */
@@ -237,8 +278,10 @@ export interface Live {
 }
 
 /**
- * Nanar's state, live. The WebSocket reconnects on its own when the server comes back, and as
- * soon as the page is shown again (phones drop connections of pages in the background).
+ * Nanar's state, live. The WebSocket reconnects on its own when the server comes back, as soon as
+ * the page is shown again (phones drop connections of pages in the background), and when Nanar
+ * has gone silent: a Wi-Fi that drops closes nothing on the phone's side, and the connection
+ * would look open for ever.
  */
 export function useLive(enabled = true): Live {
   const [live, setLive] = useState<Live>({ state: null, connected: false });
@@ -247,33 +290,55 @@ export function useLive(enabled = true): Live {
     let socket: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let closed = false;
+    let heard = 0; // when Nanar last said something (or the connection was tried)
     const connect = () => {
       clearTimeout(retry);
+      heard = Date.now();
       const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-      socket = new WebSocket(`${scheme}://${location.host}/api/live`);
-      socket.onmessage = (event) => {
-        const message = JSON.parse(String(event.data)) as { type: string; state: State };
+      const opened = new WebSocket(`${scheme}://${location.host}/api/live`);
+      socket = liveSocket = opened;
+      opened.onmessage = (event) => {
+        heard = Date.now();
+        const message = JSON.parse(String(event.data)) as LiveMessage;
         if (message.type === 'state') setLive({ state: message.state, connected: true });
+        else if (message.type === 'result') {
+          waiting.get(message.id)?.(message.code);
+          waiting.delete(message.id);
+        }
       };
-      socket.onclose = () => {
+      opened.onclose = () => {
         setLive((previous) => ({ ...previous, connected: false }));
         if (!closed) retry = setTimeout(connect, 1500);
       };
     };
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && socket?.readyState !== WebSocket.OPEN) {
-        if (socket) socket.onclose = null; // no second reconnection from the old one
-        socket?.close();
-        connect();
-      }
+    const reconnect = () => {
+      if (socket) socket.onclose = null; // no second reconnection from the old one
+      socket?.close();
+      setLive((previous) => ({ ...previous, connected: false }));
+      connect();
     };
+    const tooQuiet = () => {
+      const limit = socket?.readyState === WebSocket.CONNECTING ? CONNECTING_MS : SILENCE_MS;
+      return Date.now() - heard > limit;
+    };
+    const onWake = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (socket?.readyState !== WebSocket.OPEN || tooQuiet()) reconnect();
+    };
+    const watchdog = setInterval(() => {
+      if (socket?.readyState !== WebSocket.CLOSED && tooQuiet()) reconnect();
+    }, 3000);
     connect();
-    document.addEventListener('visibilitychange', onVisible);
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('online', onWake);
     return () => {
       closed = true;
       clearTimeout(retry);
-      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(watchdog);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('online', onWake);
       socket?.close();
+      liveSocket = null;
     };
   }, [enabled]);
   return live;

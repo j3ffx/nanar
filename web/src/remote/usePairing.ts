@@ -50,7 +50,8 @@ export function keyFromHash(hash: string): string | null {
  *
  * The QR code holds the PC's IP address, which always works but changes with the Wi-Fi. Once
  * paired there, the page looks for nanar.local in the background and moves there when it
- * answers, so that the pairing and the home screen icon outlive a change of network.
+ * answers, so that the pairing and the home screen icon outlive a change of network. A phone
+ * paired before and arriving on an address it has no cookie for pairs with the key it kept.
  */
 export function usePairing(): { status: PairingStatus; hop: Hop; recheck: () => void } {
   const [status, setStatus] = useState<PairingStatus>('checking');
@@ -63,19 +64,36 @@ export function usePairing(): { status: PairingStatus; hop: Hop; recheck: () => 
     const run = async () => {
       const key = keyFromHash(location.hash);
       if (key) {
-        // Out of the address bar (and of the history) as soon as it has been read.
-        history.replaceState(null, '', location.pathname + location.search);
         try {
           await pair(key);
         } catch (error) {
           if (error instanceof ApiError && error.code === 'wrong_key') {
+            history.replaceState(null, '', location.pathname + location.search);
             if (alive) setStatus('wrong-key');
             return;
           }
+          // The network, just after joining a Wi-Fi: the key stays, for the next try.
+          if (!alive) return;
+          setStatus('offline');
+          retry = setTimeout(() => setAttempt((n) => n + 1), 3000);
+          return;
         }
+        // Out of the address bar (and of the history) once it has done its work.
+        history.replaceState(null, '', location.pathname + location.search);
       }
       try {
-        const paired = await isPaired();
+        let paired = await isPaired();
+        const known = remembered().key;
+        if (!paired && known) {
+          // Another address of the same Nanar (each has its own cookie): this phone was paired.
+          paired = await pair(known).then(
+            () => true,
+            (error: unknown) => {
+              if (error instanceof ApiError && error.code === 'wrong_key') forget();
+              return false;
+            },
+          );
+        }
         if (!alive) return;
         setStatus(paired ? 'paired' : 'unpaired');
         if (paired && location.hostname !== NAME) void moveToName(() => alive, setHop);
@@ -111,62 +129,98 @@ async function moveToName(alive: () => boolean, setHop: (hop: Hop) => void): Pro
   const key = pairing?.url ? keyFromHash(new URL(pairing.url).hash) : null;
   if (!pairing?.name || !key) return; // no name announced (or `--local`)
   const url = `http://${pairing.name}/#k=${key}`;
-  setHop({ state: 'trying' });
+  // Back from a fallback: the name will answer again sooner or later, and there is nothing to
+  // say about it until then. Otherwise a few tries, then an offer to try by hand.
+  const fellBack = remembered().fellBack;
+  if (!fellBack) setHop({ state: 'trying' });
   let why: 'timeout' | 'refused' = 'timeout';
-  for (let i = 0; i < TRIES && alive(); i++) {
+  for (let i = 0; (fellBack || i < TRIES) && alive(); i++) {
     const result = await probe(pairing.name);
     if (result === 'ok') {
+      remember({ fellBack: false });
       location.replace(url);
       return;
     }
     why = result;
-    if (why === 'refused') break; // refused at once: asking again changes nothing
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!fellBack && why === 'refused') break; // refused at once: asking again changes nothing
+    await new Promise((resolve) => setTimeout(resolve, fellBack ? FALLBACK_RETRY_MS : 1000));
   }
   if (alive()) setHop({ state: 'unreachable', why, url });
 }
 
-const ADDRESSES = 'nanar.addresses'; // localStorage: the PC's addresses, last seen
-const FALLBACK_MS = 6000; // disconnected this long on nanar.local: try the addresses
+const REMEMBERED = 'nanar.remote'; // localStorage: how to reach Nanar when this address stops
+const FALLBACK_MS = 6000; // disconnected this long: try the other ways to reach the PC
+const FALLBACK_RETRY_MS = 20_000; // how often a page that fell back asks for the name again
+
+interface Remembered {
+  key: string | null;
+  /** The PC's other ways in, "host:port": its name and its addresses, last seen. */
+  hosts: string[];
+  fellBack: boolean;
+}
+
+function remembered(): Remembered {
+  try {
+    const raw = JSON.parse(localStorage.getItem(REMEMBERED) ?? '{}') as Partial<Remembered>;
+    return { key: raw.key ?? null, hosts: raw.hosts ?? [], fellBack: raw.fellBack ?? false };
+  } catch {
+    return { key: null, hosts: [], fellBack: false }; // no storage (a private window)
+  }
+}
+
+function remember(changes: Partial<Remembered>): void {
+  try {
+    localStorage.setItem(REMEMBERED, JSON.stringify({ ...remembered(), ...changes }));
+  } catch {
+    // no storage: no fallback, nothing else lost
+  }
+}
+
+function forget(): void {
+  try {
+    localStorage.removeItem(REMEMBERED);
+  } catch {
+    // nothing to forget then
+  }
+}
+
+/** The address of `host` for this phone, on the same page, pairing it there with `key`. */
+export function fallbackUrl(host: string, path: string, key: string | null): string {
+  return `http://${host}${path}${key ? `#k=${key}` : ''}`;
+}
 
 /**
- * On nanar.local, keeps the PC's IP addresses, and moves back to the first that answers when
- * the name stops answering (a Wi-Fi that dropped and came back can leave it unheard for
- * minutes). The phone is paired there too: the QR code opened the page there first. Once the
- * name answers again, the page moves back to it on its own (`moveToName`).
+ * Keeps the PC's other ways in (its name, its addresses, and the key, as each has its own cookie),
+ * and moves to the first that answers when this one stops: a Wi-Fi that dropped and came back can
+ * leave nanar.local unheard for minutes, and the PC's address changes with the network. Once the
+ * name answers again, the page moves back to it (`moveToName`).
  */
 export function useAddressFallback(connected: boolean): void {
   useEffect(() => {
-    if (!connected || location.hostname !== NAME) return;
+    if (!connected) return;
     fetchPairing()
       .then((pairing) => {
-        try {
-          if (pairing.addresses.length)
-            localStorage.setItem(ADDRESSES, JSON.stringify(pairing.addresses));
-        } catch {
-          // no storage (a private window): no fallback, nothing else lost
-        }
+        const key = pairing.url ? keyFromHash(new URL(pairing.url).hash) : null;
+        const hosts = pairing.name ? [pairing.name, ...pairing.addresses] : pairing.addresses;
+        if (hosts.length) remember({ key, hosts });
       })
       .catch(() => {});
   }, [connected]);
 
   useEffect(() => {
-    if (connected || location.hostname !== NAME) return;
-    let addresses: string[] = [];
-    try {
-      addresses = JSON.parse(localStorage.getItem(ADDRESSES) ?? '[]') as string[];
-    } catch {
-      return;
-    }
-    if (!addresses.length) return;
+    if (connected) return;
+    const { key, hosts } = remembered();
+    const others = hosts.filter((host) => host !== location.host);
+    if (!others.length) return;
     let alive = true;
     void (async () => {
       while (alive) {
         await new Promise((resolve) => setTimeout(resolve, FALLBACK_MS));
-        for (const address of addresses) {
+        for (const host of others) {
           if (!alive) return;
-          if ((await probe(address)) === 'ok' && alive) {
-            location.replace(`http://${address}${location.pathname}`);
+          if ((await probe(host)) === 'ok' && alive) {
+            remember({ fellBack: !host.startsWith(`${NAME}:`) });
+            location.replace(fallbackUrl(host, location.pathname, key));
             return;
           }
         }

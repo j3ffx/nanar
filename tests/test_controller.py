@@ -464,3 +464,16 @@ def test_subtitles_found_online_play_now_and_with_the_next_episodes(
     controller.command("next")  # picked for the saga: found for this one too, in the background
     wait_for(lambda: subtitles.found == ["Saga", "Saga 2"])
     wait_for(lambda: sessions.last.commands[-1][0] == "sub_add")
+
+
+def test_mpv_refusing_a_command_while_a_file_opens_is_no_silence(
+    controller: Controller, library: Library, sessions: FakeSessions
+) -> None:
+    controller.play(video_id(library, "Seul"))
+
+    def refuse(action: str, value: Any = None, *, osd: bool = False) -> None:
+        raise SystemError("mpv: property unavailable")
+
+    sessions.last.command = refuse  # type: ignore[method-assign]
+    with pytest.raises(CommandError, match="not_ready"):
+        controller.command("seek", 10)

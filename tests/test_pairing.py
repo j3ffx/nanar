@@ -1,7 +1,9 @@
 import ipaddress
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
-from nanar.pairing import lan_addresses, load_key, remote_url
+from nanar.pairing import lan_addresses, load_key, remote_url, usable_addresses
 from nanar.player import Track
 
 
@@ -33,3 +35,32 @@ def test_tracks_are_named_in_french() -> None:
     assert track("tlh", None) == "tlh"
     assert track(None, "Commentaires") == "Commentaires"
     assert track(None, None) == "Piste 3"
+
+
+def adapter(name: str, *addresses: str, prefix: int = 24) -> Any:
+    ips = [SimpleNamespace(ip=a, network_prefix=prefix) for a in addresses]
+    return SimpleNamespace(nice_name=name, ips=ips)
+
+
+def test_a_closed_hotspot_keeps_its_address_but_no_phone_can_use_it() -> None:
+    adapters = [
+        adapter("Microsoft Wi-Fi Direct Virtual Adapter #2", "192.168.137.1"),
+        adapter("Intel(R) Wi-Fi 6 AX201 160MHz", "10.0.0.5"),
+    ]
+    assert usable_addresses(adapters, "10.0.0.5", hotspot=False) == ["10.0.0.5"]
+    assert usable_addresses(adapters, "10.0.0.5", hotspot=True) == ["10.0.0.5", "192.168.137.1"]
+
+
+def test_a_vpn_never_reaches_the_qr_code_even_as_the_default_route() -> None:
+    adapters = [
+        adapter("WireGuard Tunnel", "10.8.0.2"),
+        adapter("Tailscale Tunnel", "100.64.1.2", prefix=32),
+        adapter("Realtek PCIe GbE", "192.168.1.20"),
+    ]
+    assert usable_addresses(adapters, "10.8.0.2", hotspot=False) == ["192.168.1.20"]
+
+
+def test_the_default_route_comes_first_and_stays_when_nothing_else_is_left() -> None:
+    adapters = [adapter("Ethernet", "192.168.56.1"), adapter("Wi-Fi", "192.168.1.20")]
+    assert usable_addresses(adapters, "192.168.1.20", hotspot=False)[0] == "192.168.1.20"
+    assert usable_addresses([], "10.0.0.5", hotspot=False) == ["10.0.0.5"]

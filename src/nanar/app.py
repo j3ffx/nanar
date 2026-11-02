@@ -23,6 +23,7 @@ from nanar.pairing import lan_addresses, remote_url
 from nanar.security import COOKIE, AccessMiddleware, Caller, key_matches
 
 TEN_YEARS = 10 * 365 * 24 * 3600
+TICK_SECONDS = 10.0  # at least this often, a phone hears from Nanar: silence means it is gone
 
 
 class PlayBody(BaseModel):
@@ -108,6 +109,18 @@ class Network:
     name: Callable[[], str | None] = field(default=lambda: None)
 
 
+async def _run_command(controller: Controller, message: dict[str, Any], *, osd: bool) -> str | None:
+    """A command from a page's socket: the code of what went wrong, or None."""
+    action = message.get("action")
+    if not isinstance(action, str):
+        return "unknown_action"
+    try:
+        await asyncio.to_thread(controller.command, action, message.get("value"), osd=osd)
+    except CommandError as error:
+        return error.code
+    return None
+
+
 def _hint(key: str) -> str | None:
     """Enough of a key to recognise it: its last four characters."""
     return f"…{key[-4:]}" if len(key) >= 8 else None
@@ -140,6 +153,7 @@ def create_app(
         title="Nanar", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
     )
     app.add_middleware(AccessMiddleware, key=key)
+    app.state.controller = controller
     phones: set[WebSocket] = set()
 
     @app.exception_handler(CommandError)
@@ -153,13 +167,15 @@ def create_app(
         response.headers["Access-Control-Allow-Origin"] = "*"
         return {"version": __version__}
 
+    # Out of the server's own thread: reading a large library takes seconds, and everything
+    # else (the phones' commands, the live state) must not wait for it.
     @app.get("/api/state")
     async def state() -> dict[str, Any]:
-        return controller.state()
+        return await asyncio.to_thread(controller.state)
 
     @app.get("/api/library")
     async def library() -> dict[str, Any]:
-        return controller.library_json()
+        return await asyncio.to_thread(controller.library_json)
 
     @app.get("/api/thumb/{kind}/{ident}", response_model=None)
     async def thumb(kind: str, ident: str) -> FileResponse | JSONResponse:
@@ -339,22 +355,45 @@ def create_app(
             loop.call_soon_threadsafe(queue.put_nowait, state)
 
         unsubscribe = controller.subscribe(push)
-        is_phone = not _caller(socket).local
-        if is_phone:
+        local = _caller(socket).local
+        if not local:
             phones.add(socket)
             controller.set_phones(len(phones))
-        try:
-            await socket.send_json({"type": "state", "state": controller.state()})
+
+        async def writer() -> None:
+            first = await asyncio.to_thread(controller.state)
+            await socket.send_json({"type": "state", "state": first})
             while True:
-                state = await queue.get()
+                try:
+                    state = await asyncio.wait_for(queue.get(), TICK_SECONDS)
+                except TimeoutError:  # a Wi-Fi that dropped closes nothing on the phone's side
+                    await socket.send_json({"type": "tick"})
+                    continue
                 while not queue.empty():  # only the latest state matters
                     state = queue.get_nowait()
                 await socket.send_json({"type": "state", "state": state})
-        except WebSocketDisconnect:
-            pass
+
+        async def reader() -> None:
+            # The phone's commands: on this connection, already open, they need no name lookup.
+            while True:
+                message = await socket.receive_json()
+                if not isinstance(message, dict) or message.get("type") != "command":
+                    continue
+                code = await _run_command(controller, message, osd=not local)
+                await socket.send_json({"type": "result", "id": message.get("id"), "code": code})
+
+        tasks = [asyncio.create_task(writer()), asyncio.create_task(reader())]
+        try:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                error = task.exception()
+                if error and not isinstance(error, WebSocketDisconnect | RuntimeError | ValueError):
+                    raise error
         finally:
+            for task in tasks:
+                task.cancel()
             unsubscribe()
-            if is_phone:
+            if not local:
                 phones.discard(socket)
                 controller.set_phones(len(phones))
 

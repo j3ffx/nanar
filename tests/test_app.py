@@ -1,3 +1,4 @@
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -456,6 +457,37 @@ def test_pages_refuse_another_sites_frame(client: TestClient) -> None:
 def test_a_websocket_must_come_from_the_same_port(client: TestClient) -> None:
     with (
         pytest.raises(WebSocketDisconnect),
-        client.websocket_connect("/api/live", headers={"origin": "http://127.0.0.1:9999"}),
+        client.websocket_connect(
+            "ws://127.0.0.1:8642/api/live", headers={"origin": "http://127.0.0.1:9999"}
+        ),
     ):
         pass
+
+
+def test_commands_go_over_the_live_connection_and_get_an_answer(
+    client: TestClient, sessions: FakeSessions
+) -> None:
+    with client.websocket_connect("ws://127.0.0.1:8642/api/live") as socket:
+        assert socket.receive_json()["type"] == "state"
+        socket.send_json({"type": "command", "id": 1, "action": "pause"})
+        while (message := socket.receive_json())["type"] != "result":
+            pass
+        assert message == {"type": "result", "id": 1, "code": "nothing_playing"}
+        assert client.post("/api/play", json={"videoId": first_film(client)}).status_code == 204
+        socket.send_json({"type": "command", "id": 2, "action": "pause"})
+        while (message := socket.receive_json())["type"] != "result":
+            pass
+        assert message == {"type": "result", "id": 2, "code": None}
+    assert sessions.last.commands == [("pause", None)]
+
+
+def test_a_phone_leaving_is_noticed_at_once(app: FastAPI, phone: TestClient) -> None:
+    pair(phone)
+    controller = app.state.controller
+    with phone.websocket_connect("ws://192.168.1.10:8642/api/live") as socket:
+        socket.receive_json()
+        assert controller.state()["phones"] == 1
+    deadline = time.monotonic() + 2
+    while controller.state()["phones"] and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert controller.state()["phones"] == 0

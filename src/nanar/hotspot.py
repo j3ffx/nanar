@@ -21,12 +21,11 @@ from dataclasses import dataclass
 
 import ifaddr
 
+from nanar.pairing import HOTSPOT_NETWORK
 from nanar.system import powershell
 
 log = logging.getLogger(__name__)
 
-# The network Windows gives its hotspot (Internet Connection Sharing).
-HOTSPOT_NETWORK = ipaddress.IPv4Network("192.168.137.0/24")
 TIMEOUT = 40.0  # seconds: turning it on takes a few, PowerShell a second or two to start
 
 

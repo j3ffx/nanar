@@ -100,7 +100,7 @@ def open_folder(
     wifi = hotspot.NoHotspot() if local else hotspot.make()
     # On the PC's own Wi-Fi (mode hôtel), the QR code leads there.
     network.addresses = lambda: hotspot.first(
-        lan_addresses(), hotspot.address() if wifi.last.on else None
+        lan_addresses(hotspot=wifi.last.on), hotspot.address() if wifi.last.on else None
     )
     if shown := os.environ.get("NANAR_SHOW_ADDRESS"):
         # Screenshots for the README: an address reserved for documentation, nothing announced.
@@ -165,7 +165,12 @@ def open_folder(
     )
     server = uvicorn.Server(
         uvicorn.Config(
-            app, host="127.0.0.1" if local else "0.0.0.0", port=port, log_level="warning"
+            app,
+            host="127.0.0.1" if local else "0.0.0.0",
+            port=port,
+            log_level="warning",
+            # A phone's next tap finds its connection still open: no new name lookup to fail.
+            timeout_keep_alive=75,
         )
     )
 
