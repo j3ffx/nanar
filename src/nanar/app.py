@@ -187,7 +187,8 @@ def create_app(
     @app.get("/api/health")
     async def health(response: Response) -> dict[str, str]:
         # Readable from any page: the remote, opened by its IP address, asks whether
-        # nanar.local answers before moving there. It says nothing but the version.
+        # nanar.local answers before moving there. It says nothing but the version
+        # and the instance.
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return {"version": __version__, "instance": instance}
