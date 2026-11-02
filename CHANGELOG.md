@@ -4,6 +4,21 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.6.0 — 2026-11-02
+
+La dernière étape avant la 1.0 : rien de neuf à apprendre, de quoi vérifier que tout tient.
+
+### Nouveautés
+
+- **La télé dit quand le pare-feu de Windows bloque le téléphone** : c’est le cas quand Nanar n’a été
+  autorisé que sur un type de réseau, par exemple sur le Wi-Fi d’un hôtel mais pas à la maison. Elle
+  explique où cocher la case ; Nanar ne touche pas lui-même au pare-feu.
+
+### Corrections
+
+- Un fichier de réglages abîmé d’une certaine façon empêchait Nanar de démarrer : il repart
+  maintenant des réglages par défaut.
+
 ## 0.5.1 — 2026-11-02
 
 **Si tu es en 0.5.0 :** sa mise à jour en un clic ne marche pas (elle ferme Nanar et s’arrête là).
