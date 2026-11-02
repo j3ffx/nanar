@@ -2,7 +2,6 @@
 // Prints the CHANGELOG.md notes of one version, for its GitHub release.
 //   node scripts/release-notes.mjs 0.1.0
 // Fails when the version has no entry: every release must say what it brings.
-// Ends with the link to the code signing policy, which the download page must show.
 import { readFileSync } from 'node:fs';
 
 const version = process.argv[2]?.replace(/^v/, '');
@@ -29,7 +28,4 @@ for (const line of lines.slice(start + 1, end === -1 ? undefined : end)) {
   if (continues) unwrapped[unwrapped.length - 1] = `${previous} ${line.trim()}`;
   else unwrapped.push(line);
 }
-const policy = 'https://github.com/j3ffx/nanar#code-signing-policy';
-console.log(
-  `${unwrapped.join('\n').trim()}\n\n---\n\nSignature : [Code signing policy](${policy}).`,
-);
+console.log(unwrapped.join('\n').trim());

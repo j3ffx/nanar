@@ -22,7 +22,8 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 - **Une bibliothèque rangée toute seule.** Nanar lit les noms des fichiers, même ceux des
   téléchargements (`Film.2023.MULTi.VFF.1080p.WEB.H264-XYZ.mkv`), pour retrouver le titre et
   l’année. Les films d’un même dossier forment une saga, dans l’ordre des années ; les épisodes
-  d’une série se suivent par saison, d’un dossier à l’autre.
+  d’une série se suivent par saison, d’un dossier à l’autre. Un film qui finit de se télécharger
+  dans le dossier apparaît tout seul.
 - **Des images, pas des noms de fichiers.** Chaque film a son image : l’affiche que tu as posée
   à côté (`Film.jpg`, ou `poster.jpg` dans son dossier), sinon une image tirée du film lui-même.
 - **Reprendre là où tu t’étais arrêté.** Nanar retient où tu en es dans chaque vidéo, coche celles
@@ -32,7 +33,6 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
   « Récemment ajoutés » ce qui vient d’arriver dans le dossier. Depuis le téléphone, tu peux
   marquer une vidéo comme vue (ou non vue) et retirer de « À suivre » le film que tu as
   abandonné.
-- **Toujours à jour.** Un film qui finit de se télécharger dans le dossier apparaît tout seul.
 - **Une fenêtre, comme un lecteur vidéo.** L’accueil s’anime pendant que tu choisis ; le film
   s’ouvre à la même place, à la même taille, et Nanar revient quand il s’arrête. En fenêtre ou en
   plein écran, à toi de voir : `F`, comme dans VLC.
@@ -62,22 +62,23 @@ Sur **Windows 10 ou 11** :
    [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
 2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
    **`Nanar.exe`**. Rien d’autre à installer.
-3. Windows ne connaît pas encore l’auteur de Nanar
-   ([pourquoi](#code-signing-policy)) : il peut afficher « Windows a protégé votre ordinateur » ou « Éditeur inconnu ». Clique sur
-   « Informations complémentaires », puis « Exécuter quand même » (ou « Exécuter »).
+3. Windows ne connaît pas encore l’auteur de Nanar ([pourquoi](#signature)) : il peut afficher
+   « Windows a protégé votre ordinateur » ou « Éditeur inconnu ». Clique sur « Informations
+   complémentaires », puis « Exécuter quand même » (ou « Exécuter »).
 4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : coche **les réseaux
    privés et publics** (un Wi-Fi d’hôtel est « public » pour Windows), sinon le téléphone ne
    trouvera pas le PC.
 5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
    clic droit sur les dossiers (« Ouvrir avec Nanar ») : c’est toi qui décides.
 
-Le fichier `.sha256` à côté du zip permet de vérifier que le téléchargement n’est pas abîmé. Tes
-réglages, ta progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier
-de Nanar : pour une nouvelle version, remplace simplement le dossier. Plus simple : dans
-**Réglages**, sur la télé, coche « Chercher les nouvelles versions ». Nanar demande alors à GitHub,
-au démarrage puis une fois par jour, s’il y a du nouveau, et propose de s’installer en un clic : il
-télécharge le zip, vérifie son SHA-256, remplace son dossier et redémarre ; si la nouvelle version
-ne répond pas, l’ancienne revient.
+Le fichier `.sha256` à côté du zip permet de vérifier que le téléchargement n’est pas abîmé.
+
+**Mettre à jour :** dans **Réglages**, sur la télé, coche « Chercher les nouvelles versions ». Nanar
+demande alors à GitHub, au démarrage puis une fois par jour, s’il y a du nouveau, et propose de
+s’installer en un clic : il télécharge le zip, vérifie son SHA-256, remplace son dossier et
+redémarre ; si la nouvelle version ne répond pas, l’ancienne revient. Tu peux aussi remplacer le
+dossier à la main : tes réglages, ta progression et les images sont rangés à part, dans
+`%LOCALAPPDATA%\nanar`.
 
 **Désinstaller :** si tu as accepté le menu Démarrer et le clic droit, retire-les d’abord : dans
 le dossier `Nanar`, clic droit dans le vide → « Ouvrir dans le Terminal », puis
@@ -121,11 +122,11 @@ peut la piloter. Depuis le dossier de Nanar, Nanar fermé, `.\Nanar.exe --new-ke
 (les téléphones associés devront le rescanner), et `.\Nanar.exe --local` coupe la télécommande.
 
 **À l’hôtel ou chez des amis**, le Wi-Fi isole souvent les appareils les uns des autres : le
-téléphone ne voit pas le PC. Sur la télé, bouton **Connecter un téléphone**, puis **Ouvrir un Wi-Fi Nanar** : Nanar
-ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et affiche deux QR codes,
-l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme quand tu fermes Nanar.
-Autre solution : active le partage de connexion de ton téléphone et connecte le PC dessus ; le QR
-code de la télé suit le changement de réseau en une trentaine de secondes.
+téléphone ne voit pas le PC. Sur la télé, bouton **Connecter un téléphone**, puis **Ouvrir un
+Wi-Fi Nanar** : Nanar ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et
+affiche deux QR codes, l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme
+quand tu fermes Nanar. Autre solution : active le partage de connexion de ton téléphone et connecte
+le PC dessus ; le QR code de la télé suit le changement de réseau en une trentaine de secondes.
 
 Les échanges ne sont pas chiffrés : sur un Wi-Fi public, quelqu’un de mal intentionné sur le même
 réseau pourrait voir ce que tu regardes, et même récupérer le code pour piloter Nanar, jusqu’à voir
@@ -173,38 +174,12 @@ Pendant un film, les habitudes de VLC :
 | `Échap`          | quitter le plein écran               |
 | `S`, `Q`         | arrêter et revenir à la bibliothèque |
 
-## Code signing policy
+## Signature
 
-La politique de signature du code de Nanar, pour la version Windows.
-
-**Où en est-on :** les versions publiées ne sont pas signées (d’où l’« Éditeur inconnu » à
-l’installation). SignPath Foundation signe gratuitement des projets libres, mais réserve son
-programme à ceux qui sont déjà connus : Nanar refera sa demande quand il le sera. Une fois
-accordée, chaque version le sera :
-
-> Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
-> [SignPath Foundation](https://signpath.org/).
-
-**Ce qui sera signé :** `Nanar.exe` seulement, construit par
-[GitHub Actions](.github/workflows/release.yml) à partir du code de ce dépôt, au moment de la
-publication. Les bibliothèques des autres projets livrées à côté (libmpv, Python, .NET…)
-gardent leur propre signature, ou n’en ont pas.
-
-**Qui fait quoi :**
-
-- auteurs (modifient le code sans autre relecture) : [j3ffx](https://github.com/j3ffx) ;
-- relecteurs (relisent toute contribution extérieure avant de l’accepter) :
-  [j3ffx](https://github.com/j3ffx) ;
-- approbateurs (valident chaque demande de signature, à la main) :
-  [j3ffx](https://github.com/j3ffx).
-
-**Confidentialité :** _This program will not transfer any information to other networked systems
-unless specifically requested by the user or the person installing or operating it._ Par défaut,
-Nanar ne parle qu’aux téléphones que tu as associés sur ton réseau local : pas de compte, pas de
-statistiques. Trois options, désactivées au départ, le font sortir sur Internet : TMDB,
-OpenSubtitles et la recherche de mises à jour sur GitHub. Les bibliothèques qu’il embarque
-(mpv, guessit, pywebview, zeroconf…) n’envoient rien non plus ; `nanar.local` est annoncé sur le
-réseau local seulement.
+Les versions publiées ne sont pas signées, d’où l’« Éditeur inconnu » de Windows : un certificat est
+payant, et le programme gratuit pour les projets libres (SignPath Foundation) est réservé à ceux qui
+sont déjà connus. Le zip est construit par [GitHub Actions](.github/workflows/release.yml) à partir
+du code de ce dépôt, et son SHA-256 est publié à côté.
 
 ## Contribuer
 

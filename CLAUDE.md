@@ -78,10 +78,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   mark it watched or not, or hide it from « À suivre » until it plays again. Tracks picked by
   hand (phone, or mpv's `B`/`V` routed through the controller) are kept per saga or series
   (`Pick`) and found again in the next video by language and title.
-- **Pictures** (`thumbnails.py`): the user's poster first, then TMDb's when the user gave a key
+- **Pictures** (`thumbnails.py`): the user's poster first, then TMDB's when the user gave a key
   (`metadata.py`), else one frame grabbed by libmpv in the background; their URL carries the
-  file's age. The phone's
-  progress bar shows frames of the video playing (`previews.py`), grabbed when asked.
+  file's age. The phone's progress bar shows frames of the video playing (`previews.py`), grabbed
+  when asked.
 - **The TV follows the phone** (`set_view`): the page, the item and the search a phone looks
   at; not the other way round, and not away from this machine's own pages (`/hotel`, `/reglages`).
 - **mpv's callbacks never wait.** They come from mpv's event thread, and closing mpv waits for that
@@ -91,19 +91,20 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   lasts until Nanar closes, never across runs.
 - **Local and private.** No telemetry, no account, no request to the Internet by default: the
   library is read from file names only. Two services are opt-in, each with the user's own key set
-  on the TV page (`/api/online`, this machine only, the keys never sent back to a page, their last four characters aside): TMDb
-  (title and year → poster, summary) and OpenSubtitles (title, year, episode, the video's hash →
-  French subtitles, kept in the data directory, never next to the films). `online.py` says what
-  is sent; nothing else ever is. A third box, off by default, has the Windows build ask GitHub's
-  API for the latest release once a day (`updates.py`); a yes on the TV page downloads it,
-  checks its SHA-256, and a PowerShell script swaps the folders once Nanar has closed, bringing
-  the old one back if the new one doesn't answer (tests run the real script). Paths from a request
-  never reach the file system. The server listens on the local network for the phones; who may
-  call what is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
-  rebinding), or a phone carrying the pairing key (`nanar_key` cookie, `HttpOnly`,
-  `SameSite=Strict`, or a Bearer header). Anything that changes state needs a JSON body; no CORS
-  header is ever granted (`/api/health` aside); a WebSocket must come from the page's exact
-  origin, and no page shows in another site's frame.
+  on the TV page (`/api/online`, this machine only, the keys never sent back to a page, their last
+  four characters aside): TMDB (title and year → poster, summary) and OpenSubtitles (title, year,
+  episode, the video's hash → French subtitles, kept in the data directory, never next to the
+  films). `online.py` says what is sent; nothing else ever is.
+- **Updates are asked for.** A box, off by default, has the Windows build ask GitHub's API for the
+  latest release once a day (`updates.py`); a yes on the TV page downloads it, checks its SHA-256,
+  and a PowerShell script swaps the folders once Nanar has closed, bringing the old one back if the
+  new one doesn't answer (tests run the real script).
+- **Who may call what** is in `security.py`. The server listens on the local network for the
+  phones: this machine (loopback address _and_ loopback `Host`, against DNS rebinding), or a phone
+  carrying the pairing key (`nanar_key` cookie, `HttpOnly`, `SameSite=Strict`, or a Bearer header).
+  Anything that changes state needs a JSON body; no CORS header is ever granted (`/api/health`
+  aside); a WebSocket must come from the page's exact origin, and no page shows in another site's
+  frame. Paths from a request never reach the file system.
 - **Pairing:** one key per installation (`pairing.py`), shown on the TV as a QR code whose URL
   carries it in the fragment (never logged; on this plain HTTP, whoever can impersonate the name
   on the network can obtain it, as the README says). Whoever sees the TV may pair: that
@@ -119,11 +120,11 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   the phone's side. "Nanar ne répond pas" means silence, never a refusal.
 - **One name on every network:** `discovery.py` announces `nanar.local` (mDNS) with the
   addresses of the real adapters (`pairing.lan_addresses` leaves out WSL, Hyper-V, VPN tunnels,
-  Bluetooth, and the hotspot's adapter while it is closed, which keeps its address). The QR code holds the IP address, which always works; the page then moves to
-  `nanar.local` when its request there succeeds, or offers a link to it (a browser may refuse a
-  page's request to a `.local` name yet open it as a link), so that the cookie and the home screen icon belong to a
-  name that outlives a change of Wi-Fi. `GET /api/health` is the one CORS-readable route, for that
-  probe.
+  Bluetooth, and the hotspot's adapter while it is closed, which keeps its address). The QR code
+  holds the IP address, which always works; the page then moves to `nanar.local` when its request
+  there succeeds, or offers a link to it (a browser may refuse a page's request to a `.local` name
+  yet open it as a link), so that the cookie and the home screen icon belong to a name that outlives
+  a change of Wi-Fi. `GET /api/health` is the one CORS-readable route, for that probe.
 - **The phone's actions show on the TV** (mpv's OSD, `osd=True`); mpv's own keys already do.
 - **User data lives outside the repository**, in the OS data directory (`platformdirs`), overridable
   with `NANAR_DATA_DIR`. The demo keeps its own (`demo/` inside it).
@@ -131,10 +132,11 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   page, to add a Start menu entry and "Ouvrir avec Nanar" on folders (`desktop/integration.py`:
   the user's own HKCU and Start menu folder only); nothing is written before a yes. Folders are
   opened, and those menus answered, from this machine only (`/api/open`, `/api/integration`).
-- **Mode hôtel** (`hotspot.py`, the TV page's "Téléphone" button): asked on the TV page only, Nanar turns on Windows' mobile
-  hotspot (WinRT through PowerShell, no dependency), shows its name and password as a Wi-Fi QR
-  code (this machine's page only, never in the live state or a log), points the remote's QR code
-  at the hotspot's address, and turns it off on exit if it turned it on.
+- **Mode hôtel** (`hotspot.py`, behind the TV page's "Connecter un téléphone" button): asked on the
+  TV page only, Nanar turns on Windows' mobile hotspot (WinRT through PowerShell, no dependency),
+  shows its name and password as a Wi-Fi QR code (this machine's page only, never in the live state
+  or a log), points the remote's QR code at the hotspot's address, and turns it off on exit if it
+  turned it on.
 - **One Nanar at a time.** A second launch hands its folder to the running one (`/api/open`) and
   stops; a page can't do that, only a process on this machine.
 - **The Windows build has no console**: output goes to `nanar.log` in the data directory.
@@ -147,22 +149,28 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
 
 ## Layout
 
-- `src/nanar/`: Python package. `library.py` (reading release names with guessit, sagas and
-  series), `player.py` (one mpv window per video, VLC-like keys), `controller.py` (the single place
-  where state changes), `app.py` (API, WebSocket, pages, manifest), `security.py` and
-  `pairing.py` (who may drive Nanar), `discovery.py` (`nanar.local`), `hotspot.py` (mode hôtel),
-  `progress.py` (and "À suivre"), `online.py`, `metadata.py` and `subtitles.py` (the opt-in
-  services), `thumbnails.py`, `previews.py` (frames for the progress bar), `watcher.py` (the
-  folder, followed), `desktop/` (the pywebview window, Win32 calls placing windows), `demo.py`
-  (made-up library played from mpv's `lavfi` sources), `cli.py`.
-  `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
+- `src/nanar/`: Python package.
+  - Library: `library.py` (reading release names with guessit, sagas and series), `folders.py` (the
+    folder shown), `watcher.py` (that folder, followed), `progress.py` (and "À suivre"),
+    `thumbnails.py`, `previews.py` (frames for the progress bar).
+  - Playback: `player.py` (mpv's window, VLC-like keys), `controller.py` (the single place where
+    state changes).
+  - Pages and phones: `app.py` (API, WebSocket, pages, manifest), `security.py` and `pairing.py`
+    (who may drive Nanar), `discovery.py` (`nanar.local`), `hotspot.py` (mode hôtel).
+  - Opt-in services: `online.py`, `metadata.py`, `subtitles.py`, `updates.py`.
+  - The rest: `cli.py`, `config.py` (data directory, settings), `system.py` (the system's programs,
+    by full path), `desktop/` (the pywebview window, Win32 calls placing windows, the menus),
+    `demo.py` (made-up library played from mpv's `lavfi` sources).
+- `tests/`: pytest (`tests/fakes.py` stands in for mpv and the window; `test_player.py` drives the
   real libmpv without video or sound).
 - `web/`: the pages (Vite, React, CSS Modules, wouter). `/tv` is the TV page (`src/tv/`, arrow-key
-  navigation in `src/lib/spatial.ts`), `/` the phone's page (`src/remote/`: pairing, then the remote). `public/` holds the
-  icons; `scripts/make-icons.py` draws the PNG ones and `src/nanar/assets/nanar.ico`
-  (the windows' icon; the process has its own taskbar identity, `win32.declare_app_id`). `npm run build` writes
-  them into `src/nanar/web/static/` (ignored), which the Python package serves and ships.
-- `scripts/`: repository checks, git hook helpers, `get-libmpv.py` (pinned libmpv build for Windows).
+  navigation in `src/lib/spatial.ts`), `/` the phone's page (`src/remote/`: pairing, then the
+  remote). `public/` holds the icons; `scripts/make-icons.py` draws the PNG ones and
+  `src/nanar/assets/nanar.ico` (the windows' icon; the process has its own taskbar identity,
+  `win32.declare_app_id`). `npm run build` writes the pages into `src/nanar/web/static/` (ignored),
+  which the Python package serves and ships.
+- `scripts/`: repository checks, git hook helpers, `get-libmpv.py` (pinned libmpv build for Windows),
+  the release's helpers.
 
 ## Dependencies
 
@@ -172,9 +180,8 @@ libmpv is pinned by name and SHA-256 in `scripts/get-libmpv.py`.
 
 ## Releases
 
-Semantic versioning. `0.1.0` comes out once Nanar is usable for real (library, remote, Windows
-build). After it: `0.x.0` for a big batch of features, `0.x.y` for fixes that matter between them;
-the smallest touches get no version of their own and wait for the next one. `CHANGELOG.md` (in
+Semantic versioning: `0.x.0` for a big batch of features, `0.x.y` for fixes that matter between
+them; the smallest touches get no version of their own and wait for the next one. `CHANGELOG.md` (in
 French, for users) says what each version brings; a lightweight tag `vX.Y.Z` makes
 `.github/workflows/release.yml` publish the GitHub release with that version's notes, the Windows
 zip and its SHA-256 (built on Windows by `scripts/build-windows.py`), and the Python package.
