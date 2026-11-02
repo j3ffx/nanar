@@ -104,8 +104,12 @@ def test_the_demo_jumps_forward_and_back() -> None:
         recorder.wait(lambda p: p.position > 0.2)
         session.command("seek_to", 20)
         recorder.wait(lambda p: p.position >= 19.5)
+        # Paused: without a screen or a sound, mpv runs ahead of the clock, out of the range.
+        session.command("pause")
+        recorder.wait(lambda p: p.paused)
+        there = recorder.latest.position
         session.command("seek", -10)
-        recorder.wait(lambda p: 9 <= p.position < 15)
+        recorder.wait(lambda p: abs(p.position - (there - 10)) < 3)
     finally:
         session.close()
 
