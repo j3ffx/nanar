@@ -29,7 +29,7 @@ export function KeyHelp({ service, onBack }: { service: Service; onBack: () => v
         {service === 'tmdb' ? 'Une clé TMDB' : 'Une clé OpenSubtitles'}
       </h2>
       {service === 'tmdb' ? <TmdbSteps /> : <OpenSubtitlesSteps />}
-      <KeyField service={service} />
+      <KeyField service={service} onDone={onBack} />
     </section>
   );
 }
@@ -56,7 +56,7 @@ function OpenButton({ service, children }: { service: Service; children: ReactNo
 }
 
 function Copy({ label, text }: { label: string; text: string }) {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
   return (
     <div className={styles.copyRow}>
       <span className={styles.copyLabel}>{label}</span>
@@ -67,12 +67,12 @@ function Copy({ label, text }: { label: string; text: string }) {
         className={styles.backButton}
         onClick={() =>
           void navigator.clipboard.writeText(text).then(
-            () => setDone(true),
-            () => {},
+            () => setDone('Copié'),
+            () => setDone('Sélectionne le texte'),
           )
         }
       >
-        {done ? 'Copié' : 'Copier'}
+        {done ?? 'Copier'}
       </button>
     </div>
   );
@@ -83,7 +83,7 @@ function TmdbSteps() {
     <>
       <p className={styles.lead}>
         C’est gratuit, le formulaire est juste long : compte dix minutes, une fois pour toutes. À
-        faire sur le PC, TMDB le déconseille sur téléphone.
+        faire sur le PC : TMDB dit que son formulaire n’est pas fait pour les téléphones.
       </p>
       <ol className={styles.howTo}>
         <li>Crée un compte sur themoviedb.org et confirme ton adresse e-mail.</li>
@@ -94,17 +94,17 @@ function TmdbSteps() {
         <li>Demande une clé, choisis un usage personnel, et accepte les conditions.</li>
         <li>
           Pour le formulaire, tu peux reprendre ceci :
-          <Copy label="Nom de l’application" text="Nanar" />
-          <Copy label="Adresse de l’application" text="https://github.com/j3ffx/nanar" />
+          <Copy label="Nom (Application Name)" text="Nanar" />
+          <Copy label="Site (Application URL)" text="https://github.com/j3ffx/nanar" />
           <Copy
-            label="Résumé"
+            label="Résumé (Application Summary)"
             text="Personal use: shows posters and summaries of my own films in Nanar, a free open source home video player."
           />
           Il demande aussi ton nom et ton adresse : ils ne vont qu’à TMDB, Nanar ne les voit jamais.
         </li>
         <li>
           TMDB affiche ensuite la clé : copie la « clé d’API » (ou le « jeton d’accès en lecture »,
-          les deux marchent) et colle-la ci-dessous.
+          les deux marchent), reviens sur Nanar (Alt+Tab) et colle-la ci-dessous.
         </li>
       </ol>
     </>
@@ -125,21 +125,22 @@ function OpenSubtitlesSteps() {
           <OpenButton service="opensubtitles">L’ouvrir dans le navigateur</OpenButton>
         </li>
         <li>
-          Crée une application :
+          Déclare une application (juste un nom sur leur site, rien à installer) :
           <Copy label="Nom" text="Nanar" />
           Laisse cochée la case « Allow anonymous downloads » si elle est là : Nanar ne se connecte
           pas à ton compte.
         </li>
-        <li>Copie sa clé (« API key ») et colle-la ci-dessous.</li>
+        <li>Copie sa clé (« API key »), reviens sur Nanar (Alt+Tab) et colle-la ci-dessous.</li>
       </ol>
     </>
   );
 }
 
-function KeyField({ service }: { service: Service }) {
+function KeyField({ service, onDone }: { service: Service; onDone: () => void }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const save = () => {
     const key = value.trim();
     if (!key) return;
@@ -148,9 +149,11 @@ function KeyField({ service }: { service: Service }) {
     setOnline({ [service]: key })
       .then(() => {
         setValue('');
+        setSaved(true);
         setMessage(SAVED[service]);
       })
       .catch((e: unknown) => {
+        setSaved(false);
         const refused = e instanceof ApiError && e.code === 'bad_key';
         setMessage(refused ? REFUSED[service] : NO_ANSWER);
       })
@@ -170,7 +173,7 @@ function KeyField({ service }: { service: Service }) {
           type="password"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Colle ta clé ici"
+          placeholder="Colle ta clé ici, puis Entrée"
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
@@ -188,9 +191,14 @@ function KeyField({ service }: { service: Service }) {
         </button>
       </div>
       {message && (
-        <p className={styles.note} role="status">
+        <p className={saved ? styles.success : styles.note} role="status">
           {message}
         </p>
+      )}
+      {saved && (
+        <button type="button" data-nav className={styles.action} autoFocus onClick={onDone}>
+          Revenir aux réglages
+        </button>
       )}
     </div>
   );

@@ -25,6 +25,16 @@ describe('nearest', () => {
     expect(nearest(card(2, 0), grid, 'down')).toBe(4);
   });
 
+  it('never skips a shorter row', () => {
+    const rows = [card(2, 0), card(0, 1), card(1, 1), card(2, 2)];
+    expect(nearest(card(2, 0), rows, 'down')).toBe(2);
+  });
+
+  it('stops at the end of a row rather than going to the next', () => {
+    const rows = [card(0, 0), card(1, 0), card(0, 1), card(1, 1), card(2, 1)];
+    expect(nearest(card(1, 0), rows, 'right')).toBe(-1);
+  });
+
   it('returns -1 at an edge', () => {
     expect(nearest(card(0, 0), grid, 'left')).toBe(-1);
     expect(nearest(card(0, 0), grid, 'up')).toBe(-1);

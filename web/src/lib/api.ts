@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Filter } from './filter';
 
@@ -48,6 +48,8 @@ export interface Library {
   entries: { kind: 'video' | 'group'; id: string }[];
   /** "À suivre": videos left in the middle, and the next of a saga or a series. */
   continue: string[];
+  /** A folder is being read: nothing to conclude from an empty library yet. */
+  scanning: boolean;
   /** "Récemment ajoutés": entries with a video new in the folder, the newest first. */
   recent: { kind: 'video' | 'group'; id: string }[];
 }
@@ -92,7 +94,14 @@ export interface State {
   /** Stops at the end of this video, or in `remaining` seconds. */
   sleep: { kind: 'end' } | { kind: 'timer'; remaining: number } | null;
   /** Mode hôtel: the PC's own Wi-Fi, which phones join to reach Nanar. */
-  hotspot: { available: boolean; on: boolean; ssid: string | null; code: string | null };
+  hotspot: {
+    available: boolean;
+    on: boolean;
+    ssid: string | null;
+    code: string | null;
+    /** Windows has been asked at least once (it takes seconds). */
+    checked: boolean;
+  };
   /** The last thing gone wrong on its own, to say once (a video that can't play). */
   notice: { code: string; seq: number } | null;
   /** New versions of the Windows build, looked for on GitHub when the user said so. */
@@ -114,6 +123,8 @@ export interface State {
 
 export interface Pairing {
   lan: boolean;
+  /** Tells this Nanar from another on the same network. */
+  instance: string;
   /** "nanar.local:8642" while that name is announced on the network. */
   name: string | null;
   addresses: string[];
@@ -134,7 +145,7 @@ let liveSocket: WebSocket | null = null;
 let lastCommand = 0;
 const waiting = new Map<number, (code: string | null) => void>();
 
-async function send(path: string, body: unknown): Promise<void> {
+async function send(path: string, body: unknown, retry = true): Promise<void> {
   const post = () =>
     fetch(path, {
       method: 'POST',
@@ -142,7 +153,8 @@ async function send(path: string, body: unknown): Promise<void> {
       body: JSON.stringify(body),
     });
   // A failed lookup of nanar.local is often over a moment later.
-  const response = await post().catch(async () => {
+  const response = await post().catch(async (error: unknown) => {
+    if (!retry) throw error;
     await new Promise((resolve) => setTimeout(resolve, 500));
     return post();
   });
@@ -164,7 +176,7 @@ export const play = (videoId: string, start?: number) =>
 export function command(action: string, value?: unknown): Promise<void> {
   const socket = liveSocket;
   if (socket?.readyState !== WebSocket.OPEN) {
-    return send('/api/command', { action, value: value ?? null });
+    return send('/api/command', { action, value: value ?? null }, false);
   }
   return new Promise((resolve, reject) => {
     const id = ++lastCommand;
@@ -197,8 +209,10 @@ export interface OnlineSettings {
 }
 
 /** This machine only: asks Windows how the hotspot is now; the live state brings the answer. */
-export async function fetchHotspot(): Promise<void> {
-  await fetch('/api/hotspot');
+export async function fetchHotspot(): Promise<{ passphrase: string | null }> {
+  const response = await fetch('/api/hotspot');
+  if (!response.ok) throw new ApiError(`http_${response.status}`);
+  return (await response.json()) as { passphrase: string | null };
 }
 
 /** This machine only: opens a service's page in the PC's browser. */
@@ -252,6 +266,17 @@ export async function fetchLibrary(): Promise<Library> {
   const response = await fetch('/api/library');
   if (!response.ok) throw new ApiError(`http_${response.status}`);
   return (await response.json()) as Library;
+}
+
+/** What went wrong on its own, said once by each page that sees it happen. */
+export function useNotices(state: State | null, show: (code: string) => void): void {
+  const seen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!state) return;
+    const seq = state.notice?.seq ?? 0;
+    if (seen.current !== null && seq > seen.current && state.notice) show(state.notice.code);
+    seen.current = seq; // the first state only says where things stand: old news stays old
+  }, [state, show]);
 }
 
 /**

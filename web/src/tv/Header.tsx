@@ -55,7 +55,7 @@ export function Header({
           className={styles.link}
           onClick={() => onNavigate('/hotel')}
         >
-          Téléphone
+          Connecter un téléphone
         </button>
         <button
           type="button"

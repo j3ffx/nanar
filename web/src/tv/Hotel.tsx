@@ -16,32 +16,47 @@ const MESSAGES: Record<string, string> = {
   no_internet:
     'Windows ne partage un Wi-Fi que si le PC a une connexion à Internet : connecte-le au Wi-Fi de l’hôtel (ou à un câble), puis réessaie.',
   unavailable: 'Ce PC ne sait pas ouvrir de Wi-Fi, ou Windows l’interdit sur ce réseau.',
-  failed: 'Windows n’a pas voulu ouvrir le Wi-Fi. Réessaie, ou ouvre-le dans ses paramètres.',
+  failed:
+    'Windows n’a pas voulu ouvrir le Wi-Fi. Réessaie, ou ouvre-le dans Paramètres › Réseau et Internet › Point d’accès sans fil mobile.',
 };
 
-const POLL_MS = 5000; // Windows closes a hotspot nobody uses, and has its own switch
+const POLL_MS = 20_000; // Windows closes a hotspot nobody uses, and has its own switch
 
 /** When the phone doesn't reach Nanar: what to check, and mode hôtel, the PC's own Wi-Fi. */
-export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: () => void }) {
+export function Hotel({
+  hotspot,
+  playing,
+  onBack,
+}: {
+  hotspot: State['hotspot'];
+  playing: boolean;
+  onBack: () => void;
+}) {
+  const [passphrase, setPassphrase] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pairing, setPairing] = useState<Pairing | null>(null);
 
   useEffect(() => {
+    if (playing) return; // this page is hidden under the film: nothing to keep up to date
     let alive = true;
-    const load = () => {
-      fetchPairing()
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // One question at a time: PowerShell can take ten seconds to answer.
+    const load = async () => {
+      await fetchPairing()
         .then((p) => alive && setPairing(p))
         .catch(() => {});
-      fetchHotspot().catch(() => {}); // the live state brings the answer
+      await fetchHotspot()
+        .then((answer) => alive && setPassphrase(answer.passphrase))
+        .catch(() => {}); // the live state brings the rest
+      if (alive) timer = setTimeout(() => void load(), POLL_MS);
     };
-    load();
-    const timer = setInterval(load, POLL_MS);
+    void load();
     return () => {
       alive = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
-  }, []);
+  }, [playing]);
 
   const turn = (on: boolean) => {
     setBusy(true);
@@ -63,7 +78,7 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
   );
 
   return (
-    <section aria-labelledby="hotel-title" className={styles.page}>
+    <section aria-labelledby="hotel-title" className={styles.page} data-careful>
       <BackButton onBack={onBack} />
       <h2 id="hotel-title" className={styles.groupTitle}>
         Connecter le téléphone
@@ -80,6 +95,7 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
               <p>
                 <strong>1.</strong> Rejoins le Wi-Fi « {hotspot.ssid} » : scanne ce code avec
                 l’appareil photo du téléphone.
+                {passphrase && ` Ou à la main : mot de passe ${passphrase}.`}
               </p>
             </li>
             {remote && (
@@ -101,8 +117,8 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
             {busy ? 'Fermeture…' : 'Fermer ce Wi-Fi'}
           </button>
           <p className={styles.note}>
-            Il se ferme aussi quand tu fermes Nanar, et Windows le ferme tout seul si aucun appareil
-            ne s’y connecte pendant quelques minutes.
+            Nanar le ferme en se fermant, s’il l’a ouvert lui-même. Windows le ferme aussi tout seul
+            si aucun appareil ne s’y connecte pendant quelques minutes.
           </p>
         </>
       ) : (
@@ -110,13 +126,19 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
           <div className={styles.step} data-wide>
             {remote}
             <div>
-              <p className={styles.settingTitle}>Rien ne s’ouvre après avoir scanné ?</p>
+              <p className={styles.settingTitle}>
+                Scanne ce code avec l’appareil photo du téléphone.
+              </p>
+              <p className={styles.note}>Rien ne s’ouvre ?</p>
               <ul className={styles.checks}>
-                <li>Le téléphone et le PC doivent être sur le même Wi-Fi.</li>
                 <li>
-                  Pare-feu : quand Windows a posé la question, il fallait autoriser Nanar. Vérifie
-                  dans « Pare-feu Windows › Autoriser une application » que Nanar est coché pour les
-                  réseaux privés et publics.
+                  Le téléphone doit être connecté au même réseau que le PC (sa box, pas la 4G ou la
+                  5G).
+                </li>
+                <li>
+                  Pare-feu : dans le menu Démarrer, tape « pare-feu », ouvre « Autoriser une
+                  application via le Pare-feu Windows », et coche Nanar pour les réseaux privés et
+                  publics.
                 </li>
                 <li>Certains Wi-Fi, surtout à l’hôtel, isolent les appareils : voici la parade.</li>
               </ul>
@@ -132,12 +154,17 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
             data-nav
             className={styles.action}
             disabled={busy || !hotspot.available}
+            data-checking={!hotspot.checked || undefined}
             onClick={() => turn(true)}
           >
-            {busy ? 'Ouverture…' : 'Ouvrir un Wi-Fi Nanar'}
+            {busy ? 'Ouverture… (Windows peut prendre une minute)' : 'Ouvrir un Wi-Fi Nanar'}
           </button>
           {!hotspot.available && !error && (
-            <p className={styles.note}>{MESSAGES[hotspot.code ?? 'no_internet']}</p>
+            <p className={styles.note}>
+              {hotspot.checked
+                ? MESSAGES[hotspot.code ?? 'unavailable']
+                : 'Nanar demande à Windows si ce PC peut ouvrir un Wi-Fi…'}
+            </p>
           )}
         </>
       )}

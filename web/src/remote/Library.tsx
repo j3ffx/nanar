@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 
 import { mark, play, setView, type Library as LibraryData, type Video } from '@/lib/api';
-import { filterEntries, isFiltered, NO_FILTER, type Filter } from '@/lib/filter';
+import { filterEntries, isFiltered, type Filter } from '@/lib/filter';
 import { clock, countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
+import { sentence } from '@/lib/messages';
 import { continueLabel, groupNext, groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
 
 import styles from './Library.module.css';
@@ -11,17 +12,19 @@ import { Sheet } from './Sheet';
 
 interface Props {
   library: LibraryData | null;
+  /** What the library shows now: the search stays, from one tab to the other. */
+  shown: Filter;
   /** After a video was started: back to the remote. */
   onStarted: () => void;
   onError: (message: string) => void;
 }
 
 /** The library on the phone: what the TV shows follows along. */
-export function Library({ library, onStarted, onError }: Props) {
+export function Library({ library, shown, onStarted, onError }: Props) {
   const [, params] = useRoute<{ id: string }>('/bibliotheque/g/:id');
   const [, navigate] = useLocation();
   const [picked, setPicked] = useState<Video | null>(null);
-  const [filter, setFilter] = useState<Filter>(NO_FILTER);
+  const [filter, setFilter] = useState<Filter>(shown);
   const groupId = params?.id ?? null;
 
   // The TV page follows: same page, the film picked here put forward there, the same search
@@ -38,12 +41,14 @@ export function Library({ library, onStarted, onError }: Props) {
     return () => clearTimeout(timer);
   }, [groupId, picked, filter]);
 
-  if (library === null) return <p className={styles.loading}>Les bobines arrivent…</p>;
+  if (library === null || (library.scanning && library.entries.length === 0)) {
+    return <p className={styles.loading}>Les bobines arrivent…</p>;
+  }
 
   const change = (video: Video, action: 'watched' | 'unwatched' | 'dismiss') => {
     navigator.vibrate?.(8);
     setPicked(null);
-    mark(video.id, action).catch(() => onError('Nanar n’a pas pu le noter.'));
+    mark(video.id, action).catch((error: unknown) => onError(sentence(error)));
   };
 
   const start = (video: Video, from?: number) => {
@@ -51,7 +56,7 @@ export function Library({ library, onStarted, onError }: Props) {
     setPicked(null);
     play(video.id, from)
       .then(onStarted)
-      .catch(() => onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'));
+      .catch((error: unknown) => onError(sentence(error)));
   };
 
   const group = groupId ? library.groups[groupId] : undefined;
@@ -209,7 +214,7 @@ export function Library({ library, onStarted, onError }: Props) {
             </>
           )}
           {!filtered && (library.continue.length > 0 || library.recent.length > 0) && (
-            <h2 className={styles.subheading}>Tout</h2>
+            <h2 className={styles.subheading}>Toute la bibliothèque</h2>
           )}
           <div className={styles.grid}>
             {entries.map(({ kind, id }) => {

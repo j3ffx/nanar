@@ -43,6 +43,7 @@ const library: Library = {
   ],
   continue: [],
   recent: [],
+  scanning: false,
 };
 
 const ids = (filter: Partial<typeof NO_FILTER>) =>

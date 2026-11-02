@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 
 import { useLibrary, useLive } from '@/lib/api';
+import { NO_FILTER } from '@/lib/filter';
 
 import { Controls, type Tab } from './Controls';
 import { Library } from './Library';
@@ -35,7 +36,8 @@ export function Remote() {
               : 'Ce téléphone n’est pas encore la télécommande.'}
           </p>
           <p className={styles.hint}>
-            Scanne le QR code affiché sur la télé avec l’appareil photo de ton téléphone.
+            Scanne le QR code affiché sur la télé avec l’appareil photo de ton téléphone. Si un film
+            passe, arrête-le : le code est sur la bibliothèque.
           </p>
         </>
       )}
@@ -46,6 +48,7 @@ export function Remote() {
 function Paired({ hop, onUnpaired }: { hop: Hop; onUnpaired: () => void }) {
   const { state, connected } = useLive();
   useAddressFallback(connected);
+
   const library = useLibrary(state?.libraryVersion);
   const [location, navigate] = useLocation();
   const tab: Tab = location.startsWith('/bibliotheque') ? 'library' : 'remote';
@@ -58,7 +61,12 @@ function Paired({ hop, onUnpaired }: { hop: Hop; onUnpaired: () => void }) {
       onTab={(next) => navigate(next === 'library' ? '/bibliotheque' : '/')}
       onUnpaired={onUnpaired}
       library={(notify) => (
-        <Library library={library} onStarted={() => navigate('/')} onError={notify} />
+        <Library
+          library={library}
+          shown={state?.view.filter ?? NO_FILTER}
+          onStarted={() => navigate('/')}
+          onError={notify}
+        />
       )}
     />
   );

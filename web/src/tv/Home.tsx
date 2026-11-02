@@ -3,7 +3,6 @@ import { useLocation } from 'wouter';
 import { useState } from 'react';
 
 import {
-  ApiError,
   answerIntegration,
   chooseFolder,
   installUpdate,
@@ -13,6 +12,7 @@ import {
 } from '@/lib/api';
 import { filterEntries, filterLabel, isFiltered, type Filter } from '@/lib/filter';
 import { countLabel } from '@/lib/format';
+import { sentence } from '@/lib/messages';
 import { continueLabel, groupWatched, ratioOf } from '@/lib/progress';
 
 import { BackButton } from './BackButton';
@@ -40,9 +40,7 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
   const films = library.entries.filter((e) => e.kind === 'video');
 
   const choose = () =>
-    chooseFolder().catch(() =>
-      onError('Impossible d’ouvrir ce dossier. Vérifie qu’il existe et que le disque est branché.'),
-    );
+    chooseFolder().catch(() => onError('Impossible d’ouvrir le choix du dossier. Réessaie.'));
 
   if (library.root === '') {
     return (
@@ -68,17 +66,16 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
     );
   }
 
-  const start = (id: string) =>
-    play(id).catch(() =>
-      onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'),
-    );
+  const start = (id: string) => play(id).catch((error: unknown) => onError(sentence(error)));
 
+  // A second copy on the page has its own place to come back to.
   const groupPoster = (id: string, key = id) => {
     const group = library.groups[id]!;
     return (
       <Poster
         key={key}
         id={id}
+        navId={key}
         title={group.title}
         detail={countLabel(group)}
         image={group.thumb}
@@ -95,6 +92,7 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
       <Poster
         key={key}
         id={id}
+        navId={key}
         title={video.title}
         detail={video.year ?? ''}
         image={video.thumb}
@@ -137,13 +135,7 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
                 type="button"
                 data-nav
                 onClick={() =>
-                  void installUpdate().catch((error: unknown) =>
-                    onError(
-                      error instanceof ApiError && error.code === 'bad_checksum'
-                        ? 'Le fichier téléchargé est abîmé : rien n’a été changé. Réessaie plus tard.'
-                        : 'La mise à jour n’a pas pu se faire : rien n’a été changé.',
-                    ),
-                  )
+                  void installUpdate().catch((error: unknown) => onError(sentence(error)))
                 }
               >
                 Mettre à jour
@@ -183,6 +175,7 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
                 <Poster
                   key={id}
                   id={id}
+                  navId={`continue-${id}`}
                   title={title}
                   detail={detail}
                   image={video.thumb}

@@ -99,7 +99,7 @@
   border-radius: 999px;
   background: rgb(29 21 40 / 0.78);
   color: var(--text);
-  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-size: clamp(1rem, 1.3vw, 2.3rem);
   font-weight: 700;
   cursor: pointer;
 }
@@ -247,7 +247,7 @@
   padding: 16px 22px;
   border-radius: var(--radius);
   background: rgb(29 21 40 / 0.86);
-  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-size: clamp(1rem, 1.3vw, 2.3rem);
 }
 
 .offer p {
@@ -306,22 +306,23 @@
 
 .error {
   position: fixed;
-  left: 50%;
-  bottom: 72px;
+  left: clamp(24px, 5vw, 80px);
+  right: clamp(24px, 5vw, 80px);
+  top: 24px;
   z-index: 20;
-  translate: -50% 0;
-  margin: 0;
+  width: fit-content;
+  margin: 0 auto;
   padding: 14px 24px;
-  border-radius: 999px;
+  border-radius: 18px;
   background: var(--cherry);
   color: #1a0710;
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: clamp(1.2rem, 1.5vw, 2.6rem);
 }
 
 /* Mode hôtel and the settings: pages of text and a few controls. */
 .page {
-  max-width: 1100px;
+  max-width: min(1500px, 80vw);
   padding-bottom: 32px;
 }
 
@@ -346,7 +347,7 @@
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-size: clamp(1rem, 1.3vw, 2.3rem);
   font-weight: 700;
   cursor: pointer;
 }
@@ -375,7 +376,7 @@
   display: grid;
   gap: 12px;
   max-width: 300px;
-  font-size: clamp(1rem, 1.2vw, 1.2rem);
+  font-size: clamp(1rem, 1.25vw, 2.2rem);
 }
 
 .step p {
@@ -383,7 +384,7 @@
 }
 
 .stepQr {
-  width: clamp(180px, 16vw, 260px);
+  width: clamp(200px, 30vh, 420px);
   height: auto;
   border-radius: 14px;
 }
@@ -414,7 +415,19 @@
   background: var(--bg-sunk);
   color: var(--text);
   font: inherit;
-  font-size: clamp(1rem, 1.2vw, 1.2rem);
+  font-size: clamp(1rem, 1.25vw, 2.2rem);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.success {
+  max-width: 70ch;
+  margin: 12px 0;
+  color: #b6f2c4;
+  font-size: clamp(1rem, 1.25vw, 2.2rem);
+  font-weight: 700;
 }
 
 .input:focus {
@@ -427,7 +440,7 @@
   align-items: center;
   gap: 14px;
   margin-top: 14px;
-  font-size: clamp(1rem, 1.2vw, 1.2rem);
+  font-size: clamp(1rem, 1.25vw, 2.2rem);
   cursor: pointer;
 }
 

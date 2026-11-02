@@ -21,7 +21,7 @@ const TRIES = 3;
 const TRY_MS = 5000; // a phone's first lookup of a .local name can take seconds
 
 /** Asks `host` (name:port) for Nanar's health: 'ok', or why it did not answer. */
-async function probe(host: string): Promise<'ok' | 'timeout' | 'refused'> {
+async function probe(host: string, instance: string | null): Promise<'ok' | 'timeout' | 'refused'> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRY_MS);
   const started = performance.now();
@@ -30,7 +30,11 @@ async function probe(host: string): Promise<'ok' | 'timeout' | 'refused'> {
       signal: controller.signal,
       cache: 'no-store',
     });
-    return response.ok ? 'ok' : 'refused';
+    if (!response.ok) return 'refused';
+    if (instance === null) return 'ok';
+    // Another Nanar under the same name (a neighbour's, at a hotel) is not this one.
+    const health = (await response.json()) as { instance?: string };
+    return health.instance === instance ? 'ok' : 'refused';
   } catch {
     // Failing at once means the browser refused; failing late, that nothing answered.
     return controller.signal.aborted || performance.now() - started > 1000 ? 'timeout' : 'refused';
@@ -63,6 +67,7 @@ export function usePairing(): { status: PairingStatus; hop: Hop; recheck: () => 
     let retry: ReturnType<typeof setTimeout> | undefined;
     const run = async () => {
       const key = keyFromHash(location.hash);
+      if (location.hash.includes(FELL_BACK)) remember({ fellBack: true });
       if (key) {
         try {
           await pair(key);
@@ -85,7 +90,7 @@ export function usePairing(): { status: PairingStatus; hop: Hop; recheck: () => 
         let paired = await isPaired();
         const known = remembered().key;
         if (!paired && known) {
-          // Another address of the same Nanar (each has its own cookie): this phone was paired.
+          // Paired here once, the cookie since lost (it isn't kept as long by every browser).
           paired = await pair(known).then(
             () => true,
             (error: unknown) => {
@@ -134,20 +139,25 @@ async function moveToName(alive: () => boolean, setHop: (hop: Hop) => void): Pro
   const fellBack = remembered().fellBack;
   if (!fellBack) setHop({ state: 'trying' });
   let why: 'timeout' | 'refused' = 'timeout';
+  let answers = 0;
   for (let i = 0; (fellBack || i < TRIES) && alive(); i++) {
-    const result = await probe(pairing.name);
-    if (result === 'ok') {
+    const result = await probe(pairing.name, pairing.instance);
+    answers = result === 'ok' ? answers + 1 : 0;
+    // Back from a fallback, the page is in use: twice in a row, and not under someone's finger.
+    const settled = !fellBack || (answers >= 2 && !document.querySelector('dialog[open]'));
+    if (result === 'ok' && settled) {
       remember({ fellBack: false });
       location.replace(url);
       return;
     }
-    why = result;
+    if (result !== 'ok') why = result;
     if (!fellBack && why === 'refused') break; // refused at once: asking again changes nothing
     await new Promise((resolve) => setTimeout(resolve, fellBack ? FALLBACK_RETRY_MS : 1000));
   }
   if (alive()) setHop({ state: 'unreachable', why, url });
 }
 
+const FELL_BACK = 'fb=1';
 const REMEMBERED = 'nanar.remote'; // localStorage: how to reach Nanar when this address stops
 const FALLBACK_MS = 6000; // disconnected this long: try the other ways to reach the PC
 const FALLBACK_RETRY_MS = 20_000; // how often a page that fell back asks for the name again
@@ -156,15 +166,21 @@ interface Remembered {
   key: string | null;
   /** The PC's other ways in, "host:port": its name and its addresses, last seen. */
   hosts: string[];
+  instance: string | null;
   fellBack: boolean;
 }
 
 function remembered(): Remembered {
   try {
     const raw = JSON.parse(localStorage.getItem(REMEMBERED) ?? '{}') as Partial<Remembered>;
-    return { key: raw.key ?? null, hosts: raw.hosts ?? [], fellBack: raw.fellBack ?? false };
+    return {
+      key: raw.key ?? null,
+      hosts: raw.hosts ?? [],
+      instance: raw.instance ?? null,
+      fellBack: raw.fellBack ?? false,
+    };
   } catch {
-    return { key: null, hosts: [], fellBack: false }; // no storage (a private window)
+    return { key: null, hosts: [], instance: null, fellBack: false }; // no storage
   }
 }
 
@@ -184,9 +200,11 @@ function forget(): void {
   }
 }
 
-/** The address of `host` for this phone, on the same page, pairing it there with `key`. */
-export function fallbackUrl(host: string, path: string, key: string | null): string {
-  return `http://${host}${path}${key ? `#k=${key}` : ''}`;
+/** The address of `host` for this phone, on the same page, pairing it there with `key`. Each
+ *  address has its own storage: only the URL can say this page fell back. */
+export function fallbackUrl(host: string, path: string, key: string | null, fell = false): string {
+  const hash = [key ? `k=${key}` : '', fell ? FELL_BACK : ''].filter(Boolean).join('&');
+  return `http://${host}${path}${hash ? `#${hash}` : ''}`;
 }
 
 /**
@@ -202,14 +220,14 @@ export function useAddressFallback(connected: boolean): void {
       .then((pairing) => {
         const key = pairing.url ? keyFromHash(new URL(pairing.url).hash) : null;
         const hosts = pairing.name ? [pairing.name, ...pairing.addresses] : pairing.addresses;
-        if (hosts.length) remember({ key, hosts });
+        if (hosts.length) remember({ key, hosts, instance: pairing.instance });
       })
       .catch(() => {});
   }, [connected]);
 
   useEffect(() => {
     if (connected) return;
-    const { key, hosts } = remembered();
+    const { key, hosts, instance } = remembered();
     const others = hosts.filter((host) => host !== location.host);
     if (!others.length) return;
     let alive = true;
@@ -218,9 +236,10 @@ export function useAddressFallback(connected: boolean): void {
         await new Promise((resolve) => setTimeout(resolve, FALLBACK_MS));
         for (const host of others) {
           if (!alive) return;
-          if ((await probe(host)) === 'ok' && alive) {
-            remember({ fellBack: !host.startsWith(`${NAME}:`) });
-            location.replace(fallbackUrl(host, location.pathname, key));
+          if ((await probe(host, instance)) === 'ok' && alive) {
+            location.replace(
+              fallbackUrl(host, location.pathname, key, !host.startsWith(`${NAME}:`)),
+            );
             return;
           }
         }

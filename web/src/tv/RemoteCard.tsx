@@ -5,10 +5,21 @@ import { fetchPairing, type Pairing } from '@/lib/api';
 import styles from './RemoteCard.module.css';
 
 const REFRESH_MS = 30_000; // the PC may change networks (a hotel, a phone's hotspot)
+const PAIRED_BEFORE = 'nanar.phoneSeen'; // localStorage: a phone has come at least once
 
-/** The QR code that turns a phone into the remote, and how many phones already are. */
+function pairedBefore(): boolean {
+  try {
+    return localStorage.getItem(PAIRED_BEFORE) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** The QR code that turns a phone into the remote; a single line once one has come, as a phone
+ *  gone to sleep shouldn't bring a big code back over the library every evening. */
 export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | null }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
+  const [seen, setSeen] = useState(pairedBefore);
 
   useEffect(() => {
     let alive = true;
@@ -24,6 +35,17 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
     };
   }, []);
 
+  useEffect(() => {
+    if (phones === 0 || seen) return;
+    try {
+      localStorage.setItem(PAIRED_BEFORE, '1');
+    } catch {
+      // the big code again next time, nothing else lost
+    }
+    const timer = setTimeout(() => setSeen(true), 0);
+    return () => clearTimeout(timer);
+  }, [phones, seen]);
+
   if (!pairing) return null;
 
   if (!pairing.lan || !pairing.url) {
@@ -37,10 +59,23 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
     );
   }
 
-  // The fixed name first when it is announced, the addresses of this network after it.
-  const [main, ...others] = pairing.name ? [pairing.name, ...pairing.addresses] : pairing.addresses;
+  if (seen || phones > 0) {
+    return (
+      <aside className={styles.card} data-compact>
+        <p className={styles.text}>
+          {phones === 0
+            ? 'Télécommande : aucun téléphone en ce moment.'
+            : phones > 1
+              ? `${phones} téléphones connectés.`
+              : '1 téléphone connecté.'}
+          {wifi && ` Wi-Fi « ${wifi} ».`}
+        </p>
+      </aside>
+    );
+  }
+
   return (
-    <aside className={styles.card} data-compact={phones > 0 || undefined}>
+    <aside className={styles.card}>
       {/* The address is in the query so that the image changes with the network. */}
       <img
         className={styles.qr}
@@ -48,23 +83,12 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
         alt="QR code de la télécommande"
       />
       <div className={styles.body}>
-        <p className={styles.title}>
-          {phones > 0
-            ? phones > 1
-              ? `${phones} téléphones connectés`
-              : '1 téléphone connecté'
-            : 'Ton téléphone est la télécommande'}
-        </p>
+        <p className={styles.title}>Ton téléphone est la télécommande</p>
         <p className={styles.text}>
-          {phones > 0
-            ? 'Un autre ? Scanne le code.'
-            : 'Sur le même Wi-Fi que le PC, scanne ce code avec son appareil photo. Rien ne s’ouvre ? Bouton « Téléphone », en haut.'}
+          Scanne ce code avec l’appareil photo du téléphone, connecté au même réseau que le PC.
         </p>
+        <p className={styles.text}>Rien ne s’ouvre ? « Connecter un téléphone », en haut.</p>
         {wifi && <p className={styles.text}>Sur le Wi-Fi « {wifi} » (mode hôtel).</p>}
-        <p className={styles.address}>
-          {main}
-          {others.length > 0 && <span className={styles.others}> · ou {others.join(' · ')}</span>}
-        </p>
       </div>
     </aside>
   );

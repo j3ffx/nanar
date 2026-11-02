@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 
 import { play, type Library } from '@/lib/api';
 import { countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
+import { sentence } from '@/lib/messages';
 import { groupNext, ratioOf, resumeLabel } from '@/lib/progress';
 
 import { BackButton } from './BackButton';
@@ -28,10 +29,7 @@ export function GroupPage({ library, groupId, onBack, onError }: Props) {
       </div>
     );
   }
-  const start = (id: string) =>
-    play(id).catch(() =>
-      onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'),
-    );
+  const start = (id: string) => play(id).catch((error: unknown) => onError(sentence(error)));
   const next = groupNext(library, group)?.id; // where the arrows start: where you left off
 
   return (

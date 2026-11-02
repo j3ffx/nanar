@@ -6,6 +6,8 @@ import styles from './Poster.module.css';
 
 interface Props {
   id: string;
+  /** Where the arrows and a return find it, when it shows twice on a page. */
+  navId?: string;
   title: string;
   detail: ReactNode;
   /** The video's picture (a poster or a frame); a colour of its own stands in without one. */
@@ -19,6 +21,7 @@ interface Props {
 
 export function Poster({
   id,
+  navId = id,
   title,
   detail,
   image,
@@ -33,7 +36,7 @@ export function Poster({
       type="button"
       className={styles.poster}
       data-nav
-      data-id={id}
+      data-id={navId}
       data-stacked={stacked || undefined}
       data-image={image ? true : undefined}
       style={style}

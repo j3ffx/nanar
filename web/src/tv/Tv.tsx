@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 
-import { command, useLibrary, useLive } from '@/lib/api';
+import { command, useLibrary, useLive, useNotices } from '@/lib/api';
 import { isFiltered, NO_FILTER, type Filter } from '@/lib/filter';
+import { noticeSentence } from '@/lib/messages';
 import { DIRECTIONS, moveFocus, scrollBehavior } from '@/lib/spatial';
 
 import { Backdrop } from './Backdrop';
@@ -18,20 +19,22 @@ import { useIdle } from './useIdle';
 
 const DIM_AFTER_MS = 4 * 60 * 1000;
 
-const NOTICES: Record<string, string> = {
-  cannot_play: 'Impossible de lire cette vidéo : le fichier a peut-être été déplacé.',
-  quota_reached: 'Plus de sous-titres en ligne pour aujourd’hui (limite d’OpenSubtitles).',
-};
-
 function findItem(root: HTMLElement | null, id: string | null): HTMLElement | null {
   return id ? (root?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`) ?? null) : null;
 }
 
-/** Where a page starts: its "resume" row, its first card; a page of text, whatever it offers. */
+/**
+ * Where a page starts: its "resume" row, or its first card, never an offer (an impatient Enter
+ * must not install an update) nor what changes this machine's network (`data-careful`).
+ */
 function firstItem(root: HTMLElement | null): HTMLElement | null {
+  const careful = root?.querySelector('[data-careful]');
+  if (careful) return root?.querySelector<HTMLElement>('main [data-back]') ?? null;
   return (
     root?.querySelector<HTMLElement>('[data-resume]') ??
-    root?.querySelector<HTMLElement>('main [data-nav]:not([data-back]):not(:disabled)') ??
+    root?.querySelector<HTMLElement>(
+      'main [data-nav]:not([data-back]):not(:disabled):not(aside *)',
+    ) ??
     root?.querySelector<HTMLElement>('main [data-nav]:not(:disabled)') ??
     null
   );
@@ -117,11 +120,15 @@ export function Tv() {
     }
   }, [view, location, navigate]);
 
-  // Back from a page, what opened it has the focus again; otherwise the first card takes it, so
-  // that the arrows work straight away.
+  // A new page starts at its top, what opened it having the focus again when coming back; its
+  // first card takes the focus otherwise, so that the arrows work straight away. A library that
+  // merely refreshed (thumbnails arriving) leaves the focus where it is.
   const cameFrom = useRef<string | null>(null);
+  const lastLocation = useRef<string | null>(null);
   useEffect(() => {
     if (!library || !root.current) return;
+    const changed = lastLocation.current !== location;
+    lastLocation.current = location;
     const opened = /^\/g\/([^/]+)/.exec(location)?.[1];
     if (opened) cameFrom.current = opened;
     if (location === '/hotel') cameFrom.current = 'open-phone';
@@ -131,10 +138,19 @@ export function Tv() {
       pending.current = null;
       return;
     }
-    if (main.current?.contains(document.activeElement)) return;
+    const active = document.activeElement;
+    if (!changed && active && active !== document.body && root.current.contains(active)) return;
+    if (changed && main.current) main.current.scrollTop = 0;
     const previous = location === '/' ? findItem(root.current, cameFrom.current) : null;
-    // Not scrolled: the top of the page, its first heading, stays in sight.
-    (previous ?? firstItem(root.current))?.focus({ preventScroll: !previous });
+    if (previous) {
+      cameFrom.current = null;
+      previous.focus({ preventScroll: true });
+      previous.scrollIntoView({ block: 'center' });
+      return;
+    }
+    const first = firstItem(root.current);
+    first?.focus({ preventScroll: true });
+    if (first?.hasAttribute('data-resume')) first.scrollIntoView({ block: 'center' });
   }, [library, location, filter]);
 
   const onError = useCallback((message: string) => {
@@ -142,15 +158,11 @@ export function Tv() {
     setTimeout(() => setError(null), 5000);
   }, []);
 
-  // What went wrong on its own (a video that can't play), once.
-  const noticed = useRef<number | null>(null);
-  const notice = state?.notice;
-  useEffect(() => {
-    if (!notice || noticed.current === notice.seq) return;
-    const first = noticed.current === null && !state?.playing;
-    noticed.current = notice.seq;
-    if (!first) onError(NOTICES[notice.code] ?? 'Quelque chose n’a pas marché.');
-  }, [notice, state?.playing, onError]);
+  // What went wrong on its own (a video that can't play).
+  useNotices(
+    state,
+    useCallback((code: string) => onError(noticeSentence(code)), [onError]),
+  );
 
   const library_ = library;
   const dim = idle && !state?.playing && (state?.phones ?? 0) > 0;
@@ -161,13 +173,22 @@ export function Tv() {
       <Backdrop />
       <Header demo={state?.demo ?? false} onNavigate={navigate} />
       <main ref={main} className={styles.main}>
-        {library_ === null ? (
+        {library_ === null || (library_.scanning && library_.entries.length === 0) ? (
           <p className={styles.loading}>Les bobines arrivent…</p>
         ) : (
           <Switch>
             <Route path="/hotel">
               <Hotel
-                hotspot={state?.hotspot ?? { available: false, on: false, ssid: null, code: null }}
+                hotspot={
+                  state?.hotspot ?? {
+                    available: false,
+                    on: false,
+                    ssid: null,
+                    code: null,
+                    checked: false,
+                  }
+                }
+                playing={!!state?.playing}
                 onBack={back}
               />
             </Route>
@@ -202,7 +223,7 @@ export function Tv() {
       </main>
       <footer className={styles.hints} aria-hidden="true">
         <span>
-          <kbd>↵</kbd> {ownPage ? 'Valider' : 'Lancer'}
+          <kbd>↵</kbd> OK
         </span>
         <span>
           <kbd>F</kbd> Plein écran

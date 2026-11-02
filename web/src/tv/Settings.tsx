@@ -14,7 +14,8 @@ import styles from './Tv.module.css';
 const LAST_ERROR: Record<string, string> = {
   bad_key: 'TMDB refuse cette clé : change-la.',
   offline: 'TMDB ne répondait pas : Nanar réessaiera à la prochaine ouverture.',
-  quota_reached: 'TMDB refuse pour l’instant : Nanar réessaiera à la prochaine ouverture.',
+  quota_reached:
+    'TMDB limite les demandes pour l’instant : Nanar réessaiera à la prochaine ouverture.',
 };
 
 /** The settings, on this machine only: what may talk to the Internet (nothing by default). */
@@ -33,16 +34,18 @@ export function Settings({
       .then(setState)
       .catch(() => {});
   useEffect(() => {
-    void reload().then(() => {
-      // The buttons have only just come: the focus goes to the first, rather than "Retour".
-      if (
-        document.activeElement?.hasAttribute('data-back') ||
-        document.activeElement === document.body
-      ) {
-        document.querySelector<HTMLElement>('main [data-nav]:not([data-back])')?.focus();
-      }
-    });
+    void reload();
   }, []);
+
+  // The buttons have only just come: the focus goes to the first, rather than "Retour". After
+  // removing a key, the button that had it is gone: the same.
+  useEffect(() => {
+    if (!online) return;
+    const active = document.activeElement;
+    if (active === document.body || active?.hasAttribute('data-back')) {
+      document.querySelector<HTMLElement>('main [data-nav]:not([data-back])')?.focus();
+    }
+  }, [online]);
 
   return (
     <section aria-labelledby="settings-title" className={styles.page}>
@@ -52,14 +55,14 @@ export function Settings({
       </h2>
       <p className={styles.lead}>
         Par défaut, Nanar ne parle à personne sur Internet. Chacune de ces options, désactivée au
-        départ, le fait parler à un seul service, qui voit l’adresse Internet de ta connexion, comme
-        tout site.
+        départ, le fait parler à un service, qui voit l’adresse Internet de ta connexion, comme tout
+        site. Une clé, c’est un code gratuit que le service te donne pour reconnaître Nanar.
       </p>
       {online && (
         <>
           <Service
             title="Affiches et résumés (TMDB)"
-            what="Nanar envoie à TMDB le titre et l’année lus dans le nom de chaque vidéo du dossier, vidéos personnelles comprises."
+            what="Nanar envoie à TMDB le titre et l’année lus dans le nom de chaque vidéo du dossier, vidéos personnelles comprises, sous la clé de ton compte."
             state={online.tmdb}
             problem={online.tmdb.error ? (LAST_ERROR[online.tmdb.error] ?? null) : null}
             onOpen={() => onNavigate('/reglages/tmdb')}
@@ -67,7 +70,7 @@ export function Settings({
           />
           <Service
             title="Sous-titres en ligne (OpenSubtitles)"
-            what="Quand tu en cherches depuis la télécommande, puis tout seul pour les épisodes suivants : le titre, l’année, l’épisode, et une empreinte du fichier (un calcul qui permet de trouver des sous-titres calés, sans dévoiler son contenu)."
+            what="Quand tu cherches des sous-titres depuis la télécommande, puis tout seul pour les épisodes suivants, Nanar envoie à OpenSubtitles le titre, l’année, l’épisode et une empreinte du fichier : un calcul qui dit quelle version tu as, pour trouver des sous-titres calés, sans envoyer son contenu."
             state={online.opensubtitles}
             problem={null}
             onOpen={() => onNavigate('/reglages/opensubtitles')}
@@ -135,13 +138,12 @@ function Service(props: {
       <h3 className={styles.settingTitle}>{props.title}</h3>
       <p className={styles.note}>{props.what}</p>
       <p className={styles.note}>
-        {props.state.set ? `Activé, avec la clé ${props.state.hint ?? ''}.` : 'Désactivé.'}
+        {props.problem
+          ? props.problem
+          : props.state.set
+            ? `Activé, avec la clé ${props.state.hint ?? ''}.`
+            : 'Désactivé.'}
       </p>
-      {props.problem && (
-        <p className={styles.note} role="alert">
-          {props.problem}
-        </p>
-      )}
       <div className={styles.settingRow}>
         <button
           type="button"

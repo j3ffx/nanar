@@ -7,37 +7,22 @@ import {
   type ReactNode,
 } from 'react';
 
-import { ApiError, command, findSubtitles, type Playing, type State, type Track } from '@/lib/api';
+import {
+  ApiError,
+  command,
+  findSubtitles,
+  useNotices,
+  type Playing,
+  type State,
+  type Track,
+} from '@/lib/api';
 import { clock, episodeCode } from '@/lib/format';
+import { noticeSentence, sentence } from '@/lib/messages';
 
 import * as Icon from './icons';
 import styles from './Remote.module.css';
 import { Sheet } from './Sheet';
 import type { Hop } from './usePairing';
-
-// What the phone says when Nanar refuses something.
-const MESSAGES: Record<string, string> = {
-  nothing_playing: 'Rien ne passe en ce moment.',
-  no_neighbour: 'Pas d’autre épisode de ce côté.',
-  bad_value: 'Nanar n’a pas compris.',
-  not_ready: 'Un instant, la vidéo se charge.',
-  no_subtitles: 'Pas de sous-titres français trouvés pour cette vidéo.',
-  quota_reached: 'OpenSubtitles refuse pour aujourd’hui : réessaie demain.',
-  bad_key: 'OpenSubtitles refuse la clé (voir les réglages sur la télé).',
-  offline: 'Le PC n’arrive pas à joindre OpenSubtitles.',
-  online_off: 'Les sous-titres en ligne ne sont pas activés.',
-};
-
-/** What to tell the user: silence is not the same as a refusal. */
-function sentence(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'Nanar ne répond pas : vérifie le Wi-Fi du téléphone.';
-  return MESSAGES[error.code] ?? 'Ça n’a pas marché. Réessaie.';
-}
-
-const NOTICES: Record<string, string> = {
-  cannot_play: 'Impossible de lire cette vidéo : le fichier a peut-être été déplacé.',
-  quota_reached: 'Plus de sous-titres en ligne pour aujourd’hui (limite d’OpenSubtitles).',
-};
 
 export type Tab = 'remote' | 'library';
 
@@ -53,7 +38,7 @@ interface Props {
 }
 
 export function Controls({ state, connected, hop, tab, onTab, onUnpaired, library }: Props) {
-  const [hopClosed, setHopClosed] = useState(false);
+  const [hopClosed, setHopClosed] = useState(() => wasClosed(HOP_CLOSED));
   const [toast, setToast] = useState<{ text: string } | null>(null);
   const notify = useCallback((text: string) => setToast({ text }), []);
   useEffect(() => {
@@ -76,15 +61,10 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
     [onUnpaired, notify],
   );
 
-  // What went wrong on its own (a video that can't play), once.
-  const noticed = useRef<number | null>(null);
-  const notice = state?.notice;
-  useEffect(() => {
-    if (!notice || noticed.current === notice.seq) return;
-    const first = noticed.current === null && !state?.playing;
-    noticed.current = notice.seq;
-    if (!first) notify(NOTICES[notice.code] ?? 'Quelque chose n’a pas marché.');
-  }, [notice, state?.playing, notify]);
+  useNotices(
+    state,
+    useCallback((code: string) => notify(noticeSentence(code)), [notify]),
+  );
 
   const playing = state?.playing ?? null;
 
@@ -129,9 +109,7 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
             <Pill onClick={() => send('next')}>
               <Icon.Next /> Lancer
             </Pill>
-            <Pill onClick={() => send('pause')}>
-              <Icon.Pause /> Rester ici
-            </Pill>
+            <Pill onClick={() => send('pause')}>Rester ici</Pill>
           </div>
         </aside>
       )}
@@ -143,24 +121,35 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
       ) : (
         <section className={styles.idle}>
           <p className={styles.lead}>{state ? 'Aucune vidéo en cours.' : 'Connexion à Nanar…'}</p>
-          <p className={styles.hint}>Choisis un film dans la bibliothèque, ou sur la télé.</p>
-          <button type="button" className={styles.idleButton} onClick={() => onTab('library')}>
-            Ouvrir la bibliothèque
-          </button>
+          {state && (
+            <>
+              <p className={styles.hint}>Choisis un film dans la bibliothèque, ou sur la télé.</p>
+              <button type="button" className={styles.idleButton} onClick={() => onTab('library')}>
+                Ouvrir la bibliothèque
+              </button>
+            </>
+          )}
         </section>
       )}
 
       {hop?.state === 'unreachable' && !hopClosed && (
         <aside className={styles.hop}>
           <p className={styles.note}>
-            Sur ce téléphone, l’adresse nanar.local n’a pas répondu. L’icône marchera sur ce Wi-Fi ;
-            sur un autre, il faudra rescanner le code de la télé.
+            Ce téléphone ne trouve pas nanar.local : tout marche ici, mais sur un autre Wi-Fi, il
+            faudra rescanner le code de la télé.
           </p>
           <div className={styles.row}>
             <a className={styles.hopLink} href={hop.url}>
               Essayer nanar.local
             </a>
-            <button type="button" className={styles.hopClose} onClick={() => setHopClosed(true)}>
+            <button
+              type="button"
+              className={styles.hopClose}
+              onClick={() => {
+                setHopClosed(true);
+                closeForGood(HOP_CLOSED);
+              }}
+            >
               Fermer
             </button>
           </div>
@@ -250,7 +239,11 @@ function NowPlaying({
         <Round label="10 secondes en arrière" onClick={() => send('seek', -10)}>
           <Icon.Jump seconds={-10} />
         </Round>
-        <Round label={playing.paused ? 'Lecture' : 'Pause'} onClick={() => send('pause')} big>
+        <Round
+          label={playing.paused ? 'Lecture' : 'Pause'}
+          onClick={() => send('pause', !playing.paused)}
+          big
+        >
           {playing.paused ? <Icon.Play /> : <Icon.Pause />}
         </Round>
         <Round label="10 secondes en avant" onClick={() => send('seek', 10)}>
@@ -313,7 +306,7 @@ function NowPlaying({
         </Pill>
       </section>
 
-      <Sheet title="Arrêt automatique" open={sheet === 'sleep'} onClose={() => setSheet(null)}>
+      <Sheet title="Minuterie" open={sheet === 'sleep'} onClose={() => setSheet(null)}>
         <ul className={styles.tracks}>
           {state.sleep?.kind === 'timer' && (
             <li>
@@ -491,7 +484,7 @@ function Progress({
       />
       <div className={styles.times}>
         <span>{clock(shown)}</span>
-        <span>{duration ? `−${clock(duration - shown)}` : ''}</span>
+        <span>{duration ? `−${clock(Math.max(0, duration - shown))}` : ''}</span>
       </div>
     </div>
   );
@@ -607,28 +600,34 @@ function Stepper(props: { label: string; value: string; onLess: () => void; onMo
 }
 
 const TIP_CLOSED = 'nanar.tipClosed'; // localStorage: the home screen tip was dismissed
+const HOP_CLOSED = 'nanar.hopClosed'; // and the note about nanar.local
+
+function wasClosed(name: string): boolean {
+  try {
+    return localStorage.getItem(name) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function closeForGood(name: string): void {
+  try {
+    localStorage.setItem(name, '1');
+  } catch {
+    // asked again next time, nothing else lost
+  }
+}
 
 /** Once: how to keep the remote one tap away. Not in the icon itself, nor once dismissed. */
 function HomeScreenTip() {
   const [closed, setClosed] = useState(() => {
-    try {
-      return (
-        localStorage.getItem(TIP_CLOSED) !== null ||
-        matchMedia('(display-mode: standalone)').matches
-      );
-    } catch {
-      return true;
-    }
+    return wasClosed(TIP_CLOSED) || matchMedia('(display-mode: standalone)').matches;
   });
   if (closed) return null;
   const iphone = /iphone|ipad/i.test(navigator.userAgent);
   const close = () => {
     setClosed(true);
-    try {
-      localStorage.setItem(TIP_CLOSED, '1');
-    } catch {
-      // asked again next time, nothing else lost
-    }
+    closeForGood(TIP_CLOSED);
   };
   return (
     <aside className={styles.hop}>
