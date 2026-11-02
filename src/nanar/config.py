@@ -48,6 +48,8 @@ class Settings:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return cls()
+        if not isinstance(raw, dict):
+            return cls()
         known = {k: v for k, v in raw.items() if k in cls.__dataclass_fields__}
         return cls(**known)
 

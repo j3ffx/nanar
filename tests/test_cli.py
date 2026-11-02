@@ -40,3 +40,19 @@ def test_offers_the_menus_again_when_an_earlier_yes_was_undone(
     assert not offers_integration(Settings(integration_answered=True))  # "no", or --uninstall
     shortcut.write_bytes(b"")
     assert offers_integration(Settings(integration_answered=True))  # "yes", menus gone since
+
+
+def test_settings_that_are_not_settings_start_over(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    for broken in ("[]", "12", "{oops"):
+        path.write_text(broken, encoding="utf-8")
+        assert Settings.load(path) == Settings()
+
+
+def test_settings_of_another_version_keep_what_this_one_knows(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    path.write_text('{"last_folder": "/films", "fullscreen": true, "gone": 1}', encoding="utf-8")
+    settings = Settings.load(path)
+    assert settings.last_folder == "/films"
+    assert settings.fullscreen
+    assert not settings.check_updates
