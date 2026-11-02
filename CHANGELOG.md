@@ -4,7 +4,7 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
-## 0.5.1 — à venir
+## 0.5.1 — 2026-11-02
 
 **Si tu es en 0.5.0 :** sa mise à jour en un clic ne marche pas (elle ferme Nanar et s’arrête là).
 Remplace le dossier à la main une dernière fois.
