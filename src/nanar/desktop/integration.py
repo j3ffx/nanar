@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from nanar.system import powershell
+
 assert sys.platform == "win32"  # also tells mypy to check this module for Windows only
 
 import winreg  # noqa: E402
@@ -57,24 +59,17 @@ def is_installed(exe: Path) -> bool:
 def _make_shortcut(link: Path, exe: Path) -> None:
     """A .lnk file, through the shell's own COM object (PowerShell ships with Windows)."""
     link.parent.mkdir(parents=True, exist_ok=True)
-
-    def quoted(path: Path) -> str:
-        return "'" + str(path).replace("'", "''") + "'"
-
+    # The paths go through the environment: a folder's name can't become part of the script.
     script = (
-        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut("
-        + quoted(link)
-        + "); $s.TargetPath = "
-        + quoted(exe)
-        + "; $s.WorkingDirectory = "
-        + quoted(exe.parent)
-        + "; $s.IconLocation = "
-        + quoted(exe)
-        + "; $s.Description = 'Tes films sur la télé'; $s.Save()"
+        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:NANAR_LINK); "
+        "$s.TargetPath = $env:NANAR_EXE; $s.WorkingDirectory = $env:NANAR_FOLDER; "
+        "$s.IconLocation = $env:NANAR_EXE; $s.Description = 'Tes films sur la télé'; $s.Save()"
     )
     subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+        [powershell(), "-NoProfile", "-NonInteractive", "-Command", script],
         check=True,
         capture_output=True,
         creationflags=subprocess.CREATE_NO_WINDOW,
+        env=os.environ
+        | {"NANAR_LINK": str(link), "NANAR_EXE": str(exe), "NANAR_FOLDER": str(exe.parent)},
     )

@@ -190,7 +190,7 @@ def open_folder(
     page = "http://localhost:5173/tv" if dev else f"http://127.0.0.1:{port}/tv"
     window = TvWindow(page, fullscreen=settings.fullscreen)
     controller.window = window
-    app_holder.append(Desktop(controller, folders, window, settings, settings_path))
+    app_holder.append(Desktop(controller, folders, window, settings, settings_path, port))
     if offers_integration(settings):
         controller.set_integration_offer(True)
     thread = threading.Thread(target=server.run, name="nanar-server", daemon=True)
@@ -213,7 +213,9 @@ class Desktop:
         window: "TvWindow",
         settings: Settings,
         settings_path: Path,
+        port: int,
     ) -> None:
+        self._port = port
         self._controller = controller
         self._folders = folders
         self._window = window
@@ -244,10 +246,15 @@ class Desktop:
         if self._controller.updates is None:
             raise CommandError("not_supported")
         try:
-            command = self._controller.updates.prepare(Path(sys.executable).parent)
+            install = Path(sys.executable).parent
+            command = self._controller.updates.prepare(install, self._port)
         except updates.UpdateError as error:
             raise CommandError(error.code) from error
-        updates.launch(command)
+        try:
+            updates.launch(command, install.parent)
+        except OSError as error:
+            self._controller.updates.cancelled()
+            raise CommandError("update_failed") from error
         self._window.close()  # the swap waits for Nanar to be gone
 
 

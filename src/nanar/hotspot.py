@@ -21,6 +21,8 @@ from dataclasses import dataclass
 
 import ifaddr
 
+from nanar.system import powershell
+
 log = logging.getLogger(__name__)
 
 # The network Windows gives its hotspot (Internet Connection Sharing).
@@ -178,7 +180,7 @@ class WindowsHotspot:
         with self._lock:
             try:
                 done = subprocess.run(
-                    ["powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                    [powershell(), "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
                     capture_output=True,
                     timeout=TIMEOUT,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
