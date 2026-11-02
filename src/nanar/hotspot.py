@@ -39,7 +39,12 @@ class Status:
 
     def public(self) -> dict[str, object]:
         """What the live state says (phones included): never the password."""
-        return {"available": self.available, "on": self.on, "ssid": self.ssid if self.on else None}
+        return {
+            "available": self.available,
+            "on": self.on,
+            "ssid": self.ssid if self.on else None,
+            "code": self.code,
+        }
 
 
 class HotspotError(Exception):
@@ -155,7 +160,7 @@ class WindowsHotspot:
         return self._run("status")
 
     def turn(self, on: bool) -> Status:
-        before = self._last.on
+        before = self._run("status").on  # Windows' own switch may have moved since
         status = self._run("on" if on else "off")
         if status.code is not None:
             raise HotspotError(status.code)
@@ -190,12 +195,15 @@ class WindowsHotspot:
                 # The output holds the password: it is not logged.
                 log.warning("the hotspot did not answer (%s)", action)
                 raise HotspotError("failed") from None
+            if not raw:  # PowerShell failed, not the hotspot: this says nothing about it
+                log.warning("the hotspot did not answer (%s)", action)
+                raise HotspotError("failed")
             status = Status(
                 available=bool(raw.get("available")),
                 on=bool(raw.get("on")),
                 ssid=raw.get("ssid") or None,
                 passphrase=raw.get("passphrase") or None,
-                code=raw.get("code") or (None if raw else "failed"),
+                code=raw.get("code") or None,
             )
             self._last = status
             return status

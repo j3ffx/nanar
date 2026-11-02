@@ -1,8 +1,8 @@
 """Subtitles from OpenSubtitles, when the user gave a key (`online.py` says what is sent).
 
-Asked from the phone for the video playing; what is downloaded stays in the data directory (never
-next to the films), and plays again with that video, and with the next episodes when they were
-picked for the series.
+Asked from the phone for the video playing, then by itself for the next episodes of a series
+they were picked for; what is downloaded stays in the data directory (never next to the films),
+and plays again with that video.
 """
 
 import hashlib

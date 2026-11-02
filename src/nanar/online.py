@@ -1,12 +1,16 @@
 """The two services Nanar may ask, when the user gave it their key (off otherwise).
 
-- TMDb (themoviedb.org): a poster and a summary for each film and series. Nanar sends the title
-  and the year read from the file name, nothing else.
+- TMDb (themoviedb.org): a poster and a summary for each film and series. In the background,
+  Nanar sends the title and the year read from each file's name: over time TMDb sees the titles
+  of the whole folder, personal videos included, tied to the key.
 - OpenSubtitles (opensubtitles.com): French subtitles for the video playing, when asked from the
-  phone. Nanar sends the title, the year, the season and episode, and the video's "hash" (a
-  checksum of its first and last 64 KiB, which finds subtitles timed for that very release).
+  phone, then by themselves for the next episodes of that series. Nanar sends the title, the
+  year, the season and episode, and the video's "hash" (a checksum of its first and last 64 KiB,
+  which finds subtitles timed for that very release).
 
-Nothing else ever leaves the PC: no account, no list of the library, no address.
+Like any website, they see the PC's public address. Nothing else leaves the PC. Their answers are
+not trusted further than their size and their address: keys never follow a redirect to another
+host, and nothing is fetched over plain HTTP.
 """
 
 import json
@@ -23,6 +27,8 @@ from typing import Any
 from nanar import __version__
 
 TIMEOUT = 15.0
+MAX_ANSWER = 20_000_000  # bytes: more than any answer, poster or subtitle file should be
+SECRET_HEADERS = ("api-key", "authorization")
 USER_AGENT = f"Nanar v{__version__}"
 TMDB = "https://api.themoviedb.org/3"
 TMDB_IMAGES = "https://image.tmdb.org/t/p/w500"
@@ -47,6 +53,26 @@ class Request:
 Fetch = Callable[[Request], bytes]  # tests give their own: no network there
 
 
+class _Redirects(urllib.request.HTTPRedirectHandler):
+    """HTTPS only, and the key stays with the host it was meant for."""
+
+    def redirect_request(  # type: ignore[no-untyped-def]
+        self, req, fp, code, msg, headers, newurl
+    ):
+        target = urllib.parse.urlsplit(newurl)
+        if target.scheme != "https":
+            raise OnlineError("offline")
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and target.hostname != urllib.parse.urlsplit(req.full_url).hostname:
+            for name in list(new.headers):
+                if name.lower() in SECRET_HEADERS:
+                    del new.headers[name]
+        return new
+
+
+_opener = urllib.request.build_opener(_Redirects())
+
+
 def fetch(request: Request) -> bytes:
     """One request, tried a second time when the connection drops (OpenSubtitles' servers close
     one now and then)."""
@@ -63,6 +89,8 @@ def fetch(request: Request) -> bytes:
 
 def _fetch_once(request: Request) -> bytes:
     method = "POST" if request.body is not None else "GET"
+    if not request.url.startswith("https://"):
+        raise OnlineError("offline")
     raw = urllib.request.Request(
         request.url,
         data=request.body,
@@ -70,9 +98,11 @@ def _fetch_once(request: Request) -> bytes:
         method=method,
     )
     try:
-        with urllib.request.urlopen(raw, timeout=TIMEOUT) as response:
-            data: bytes = response.read()
-            return data
+        with _opener.open(raw, timeout=TIMEOUT) as response:
+            data: bytes = response.read(MAX_ANSWER + 1)
+        if len(data) > MAX_ANSWER:
+            raise OnlineError("offline")
+        return data
     except urllib.error.HTTPError as error:
         if error.code in (401, 403):
             raise OnlineError("bad_key") from None

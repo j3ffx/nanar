@@ -3,11 +3,13 @@
 import json
 import struct
 import time
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from nanar import online
 from nanar.library import build
 from nanar.metadata import Metadata
 from nanar.online import OnlineError, OpenSubtitles, Request, Tmdb, Wanted, moviehash
@@ -112,7 +114,7 @@ def test_metadata_looks_each_title_up_once_and_keeps_it(tmp_path: Path) -> None:
         {
             "https://api.themoviedb.org/3/search/movie": MOVIE,
             "https://api.themoviedb.org/3/search/tv": {"results": []},
-            "https://image.tmdb.org/t/p/w500/yeti.jpg": b"jpeg",
+            "https://image.tmdb.org/t/p/w500/yeti.jpg": b"\xff\xd8jpeg",
         }
     )
     ready: list[bool] = []
@@ -131,7 +133,7 @@ def test_metadata_looks_each_title_up_once_and_keeps_it(tmp_path: Path) -> None:
     assert info["overview"] == "Un yéti."
     poster = metadata.poster(info)
     assert poster is not None
-    assert poster.read_bytes() == b"jpeg"
+    assert poster.read_bytes() == b"\xff\xd8jpeg"
     series = next(iter(library.groups))
     assert metadata.of_group(library, series) is None  # TMDb knew nothing
 
@@ -178,3 +180,24 @@ def test_no_subtitles_found_says_so(tmp_path: Path) -> None:
     subtitles.configure("key")
     with pytest.raises(OnlineError, match="no_subtitles"):
         subtitles.find("/films", video, None)
+
+
+def test_keys_never_follow_a_redirect_to_another_host() -> None:
+    handler: Any = online._Redirects()
+    raw = urllib.request.Request(
+        "https://api.opensubtitles.com/x", headers={"Api-Key": "secret", "Accept": "a/b"}
+    )
+    new = handler.redirect_request(raw, None, 302, "", {}, "https://other.test/y")
+    assert new is not None
+    assert "Api-key" not in new.headers
+    same = handler.redirect_request(raw, None, 302, "", {}, "https://api.opensubtitles.com/z")
+    assert same is not None
+    assert same.headers["Api-key"] == "secret"
+    with pytest.raises(OnlineError):
+        handler.redirect_request(raw, None, 302, "", {}, "http://other.test/y")
+
+
+def test_only_https_is_fetched() -> None:
+    for url in ("http://dl.test/x", "file:///C:/Windows/win.ini"):
+        with pytest.raises(OnlineError):
+            online.fetch(Request(url, {}))

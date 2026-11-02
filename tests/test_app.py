@@ -381,7 +381,10 @@ def test_only_this_machine_opens_the_hotspot_and_sees_its_password(
     assert tv.get("/api/hotspot/qr.svg").status_code == 404  # closed
     assert phone.post("/api/hotspot", json={"on": True}).status_code == 403
     assert tv.post("/api/hotspot", json={"on": True}).status_code == 204
-    assert controller.state()["hotspot"] == {"available": True, "on": True, "ssid": "Nanar"}
+    assert controller.state()["hotspot"]["on"]
+    assert controller.state()["hotspot"]["ssid"] == "Nanar"
+    assert tv.get("/api/hotspot").json()["on"]
+    assert phone.get("/api/hotspot").status_code == 403
     assert tv.get("/api/hotspot/qr.svg").headers["content-type"] == "image/svg+xml"
     assert phone.get("/api/hotspot/qr.svg").status_code == 404
     assert "secret12" not in phone.get("/api/state").text

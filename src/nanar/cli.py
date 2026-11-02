@@ -175,13 +175,19 @@ def open_folder(
     )
 
     def stop_all() -> None:
-        controller.shutdown()
-        thumbnails.stop()
-        metadata.stop()
-        updates.stop()
-        folders.stop()
-        announcer.stop()
-        wifi.close()
+        for stop in (
+            controller.shutdown,
+            thumbnails.stop,
+            metadata.stop,
+            updates.stop,
+            folders.stop,
+            announcer.stop,
+            wifi.close,
+        ):
+            try:  # one that fails must not leave the others, the hotspot above all, running
+                stop()
+            except Exception as error:
+                print(f"closing {getattr(stop, '__qualname__', stop)}: {error}")
 
     if headless:
         try:

@@ -240,6 +240,18 @@ def create_app(
         controller.set_integration_offer(False)
         return None
 
+    @app.get("/api/hotspot", response_model=None)
+    async def read_hotspot(request: Request) -> dict[str, object] | JSONResponse:
+        """What Windows says now: it closes a hotspot nobody uses, and has its own switch."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        try:
+            status = await asyncio.to_thread(wifi.status)
+        except HotspotError:
+            status = wifi.last
+        controller.set_hotspot(status.public())
+        return status.public()
+
     @app.post("/api/hotspot", status_code=204, response_model=None)
     async def turn_hotspot(body: HotspotBody, request: Request) -> JSONResponse | None:
         """Mode hôtel: opens (or closes) the PC's own Wi-Fi. Asked on the TV page only: it

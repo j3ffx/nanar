@@ -2,12 +2,14 @@
 
 import json
 import os
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import platformdirs
 
 DEFAULT_PORT = 8642
+_saving = threading.Lock()  # the controller's thread and the updates' may save at once
 
 
 def data_dir(*, demo: bool = False) -> Path:
@@ -50,6 +52,10 @@ class Settings:
         return cls(**known)
 
     def save(self, path: Path) -> None:
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(asdict(self), indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(path)
+        text = json.dumps(asdict(self), indent=2, ensure_ascii=False)
+        with _saving:
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            if os.name == "posix":  # it may hold the user's keys
+                tmp.chmod(0o600)
+            tmp.replace(path)

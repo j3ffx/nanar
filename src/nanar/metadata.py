@@ -19,6 +19,7 @@ from nanar.online import OnlineError, Tmdb
 RETRY_MISSES_AFTER = 30 * 86400
 PAUSE = 0.25  # seconds between two lookups: TMDb is free, be kind to it
 ANNOUNCE_EVERY = 5  # lookups between two announcements to the pages
+IMAGE_STARTS = (b"\xff\xd8", b"\x89PNG", b"RIFF")  # JPEG, PNG, WebP
 
 log = logging.getLogger(__name__)
 
@@ -163,7 +164,10 @@ class Metadata:
                 self._posters.mkdir(parents=True, exist_ok=True)
                 target = self._posters / name
                 if not target.is_file():
-                    target.with_suffix(".tmp").write_bytes(tmdb.poster(info.poster))
+                    data = tmdb.poster(info.poster)
+                    if not data.startswith(IMAGE_STARTS):
+                        raise ValueError("not a picture")
+                    target.with_suffix(".tmp").write_bytes(data)
                     target.with_suffix(".tmp").replace(target)
                 entry["poster"] = name
         with self._lock:
