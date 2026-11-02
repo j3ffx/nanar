@@ -105,11 +105,14 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   header is ever granted (`/api/health` aside); a WebSocket must come from the page's exact
   origin, and no page shows in another site's frame.
 - **Pairing:** one key per installation (`pairing.py`), shown on the TV as a QR code whose URL
-  carries it in the fragment (never sent to a server or logged). Whoever sees the TV may pair: that
+  carries it in the fragment (never logged; on this plain HTTP, whoever can impersonate the name
+  on the network can obtain it, as the README says). Whoever sees the TV may pair: that
   is the point. `--new-key` unpairs every phone, `--local` listens on loopback only. A paired
   phone's manifest start URL carries the key, so that an iPhone home screen icon (cookies of its
   own) is paired too. A paired phone also keeps the key in `localStorage`, with the PC's other
-  addresses: each address has its own cookie, and falling back to one must not unpair it.
+  addresses: each address has its own cookie and storage, so moving to another carries the key in
+  the URL's fragment. `/api/health` names the instance, so as not to hop to another Nanar by
+  mistake (no proof against a hostile one).
 - **The live connection tells the truth.** Player commands go over the WebSocket, already open:
   each new connection would need `nanar.local` to resolve again. The server sends a tick every ten
   seconds and the page reconnects after 25 s of silence, as a Wi-Fi that drops closes nothing on

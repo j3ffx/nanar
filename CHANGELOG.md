@@ -15,8 +15,7 @@ Remplace le dossier à la main une dernière fois.
   déjà ouverte, et `nanar.local` n’annonce plus une adresse que le téléphone ne peut pas joindre.
 - **La télécommande ne se retrouve plus « pas encore associée »** quand elle repasse de
   `nanar.local` à l’adresse du PC : elle s’y associe toute seule, et revient au nom dès qu’il répond.
-- « Connecté » ne s’affiche plus sur un Nanar disparu : la télécommande remarque le silence et
-  repart d’elle-même.
+- La télécommande remarque quand Nanar ne répond plus, et repart d’elle-même.
 - **La mise à jour en un clic marche**, et l’ancienne version revient si la nouvelle ne répond pas.
 - Sécurité : une adresse piégée pouvait faire se connecter le PC à une autre machine, sans clé ; un
   programme posé dans un dossier de films pouvait être lancé à la place de PowerShell. Les deux
@@ -34,8 +33,8 @@ Remplace le dossier à la main une dernière fois.
 - **Une page pour obtenir chaque clé** (TMDB, OpenSubtitles) : les étapes, un bouton pour ouvrir la
   page, de quoi copier les réponses du formulaire. La clé ne s’affiche plus en grand une fois
   enregistrée.
-- **« Téléphone » et « Réglages » en haut de la télé**, plus au bout de la bibliothèque. « Téléphone »
-  dit quoi vérifier quand rien ne s’ouvre, et mène au mode hôtel.
+- **« Connecter un téléphone » et « Réglages » en haut de la télé**, plus au bout de la
+  bibliothèque. Le premier dit quoi vérifier quand rien ne s’ouvre, et mène au mode hôtel.
 - Une série s’ouvre sur l’épisode où tu en es, avec « Reprendre » sur le téléphone. Le téléphone
   explique comment se mettre sur l’écran d’accueil.
 - « Mode nuit » devient « Son de nuit », et d’autres textes plus clairs. Le bandeau de la télé et les

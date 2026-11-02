@@ -107,8 +107,8 @@ mires générées à la volée.
 3. Ajoute-la à l’écran d’accueil pour la retrouver d’un geste : sur iPhone, bouton Partager puis
    « Sur l’écran d’accueil » ; sur Android, menu ⋮ puis « Ajouter à l’écran d’accueil ».
 
-Rien ne s’ouvre ? Bouton **Téléphone**, en haut de la télé : ce qu’il faut vérifier, et le mode
-hôtel.
+Rien ne s’ouvre ? Bouton **Connecter un téléphone**, en haut de la télé : ce qu’il faut vérifier, et
+le mode hôtel.
 
 Le code de la télé contient l’adresse du PC, qui change d’un Wi-Fi à l’autre. Nanar s’annonce aussi
 sous le nom **`nanar.local`** : quand ton téléphone sait trouver ce nom (les iPhone toujours, Android
@@ -121,15 +121,16 @@ peut la piloter. Depuis le dossier de Nanar, Nanar fermé, `.\Nanar.exe --new-ke
 (les téléphones associés devront le rescanner), et `.\Nanar.exe --local` coupe la télécommande.
 
 **À l’hôtel ou chez des amis**, le Wi-Fi isole souvent les appareils les uns des autres : le
-téléphone ne voit pas le PC. Sur la télé, bouton **Téléphone**, puis **Ouvrir un Wi-Fi Nanar** : Nanar
+téléphone ne voit pas le PC. Sur la télé, bouton **Connecter un téléphone**, puis **Ouvrir un Wi-Fi Nanar** : Nanar
 ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et affiche deux QR codes,
 l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme quand tu fermes Nanar.
 Autre solution : active le partage de connexion de ton téléphone et connecte le PC dessus ; le QR
 code de la télé suit le changement de réseau en une trentaine de secondes.
 
 Les échanges ne sont pas chiffrés : sur un Wi-Fi public, quelqu’un de mal intentionné sur le même
-réseau pourrait voir ce que tu regardes, et même récupérer le code pour piloter Nanar. Le Wi-Fi Nanar
-ou le partage de connexion évitent ça.
+réseau pourrait voir ce que tu regardes, et même récupérer le code pour piloter Nanar, jusqu’à voir
+la liste de tes vidéos et leurs images. Le Wi-Fi Nanar ou le partage de connexion évitent ça tant que
+le téléphone y reste. Si ça arrive, `.\Nanar.exe --new-key` change le code.
 
 ## Affiches et sous-titres en ligne (en option)
 
@@ -142,7 +143,7 @@ de la télé : une page explique pas à pas comment obtenir chaque clé, gratuit
   va.
 - **OpenSubtitles**, pour les sous-titres. Le bouton apparaît dans les sous-titres de la
   télécommande. Nanar envoie le titre, l’année, l’épisode et l’empreinte de la vidéo (un calcul sur
-  le fichier, qui permet de trouver des sous-titres calés sur ta version, sans dévoiler son
+  le fichier, qui dit quelle version tu as pour trouver des sous-titres calés, sans envoyer son
   contenu). Une fois choisis pour une série, ils sont cherchés tout seuls pour les épisodes suivants,
   dans la limite de cinq par jour. Ils sont gardés dans le dossier de données de Nanar, pas à côté
   de tes films.
