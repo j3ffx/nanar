@@ -97,6 +97,7 @@ def test_streams_the_state_over_a_websocket(client: TestClient) -> None:
 
 def test_gives_the_tv_the_qr_code_to_show(client: TestClient) -> None:
     pairing = client.get("/api/pairing").json()
+    assert pairing.pop("instance")
     assert pairing == {
         "lan": True,
         "name": None,
@@ -122,12 +123,9 @@ def test_any_page_may_ask_whether_nanar_answers(phone: TestClient) -> None:
 def test_says_when_phones_cannot_connect(controller: Controller) -> None:
     app = create_app(controller, key=KEY, network=Network(port=8642, lan=False))
     client = TestClient(app, base_url="http://127.0.0.1:8642", client=TV)
-    assert client.get("/api/pairing").json() == {
-        "lan": False,
-        "name": None,
-        "addresses": [],
-        "url": None,
-    }
+    pairing = client.get("/api/pairing").json()
+    assert not pairing["lan"]
+    assert pairing["url"] is None
     assert client.get("/api/pairing/qr.svg").status_code == 404
 
 
@@ -238,7 +236,7 @@ def test_the_tv_follows_what_a_phone_looks_at(client: TestClient, phone: TestCli
         "filter": {"query": "", "kind": "all", "unwatched": False},
         "seq": before + 1,
     }
-    assert phone.post("/api/view", json={"path": "http://evil"}).status_code == 409
+    assert phone.post("/api/view", json={"path": "http://evil"}).status_code == 422
 
 
 def test_the_tv_shows_what_a_phone_searches(client: TestClient, phone: TestClient) -> None:
@@ -511,3 +509,37 @@ def test_only_this_machine_opens_where_to_get_a_key(
     assert client.post("/api/link", json={"target": "https://evil.test"}).status_code == 422
     assert client.post("/api/link", json={"target": "tmdb"}).status_code == 204
     assert opened == ["https://www.themoviedb.org/settings/api"]
+
+
+def test_another_sites_picture_cannot_probe_the_api(client: TestClient) -> None:
+    cross = {"Sec-Fetch-Site": "cross-site"}
+    assert client.get("/api/library", headers=cross).status_code == 403
+    assert client.get("/api/thumb/v/abc", headers=cross).status_code == 403
+    assert client.get("/api/health", headers=cross).status_code == 200  # the page's own probe
+    assert client.get("/api/library", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
+
+
+def test_a_huge_request_is_refused_before_it_fills_the_memory(phone: TestClient) -> None:
+    body = b'{"key":"' + b"x" * 100_000 + b'"}'
+    answer = phone.post("/api/pair", content=body, headers={"Content-Type": "application/json"})
+    assert answer.status_code == 413
+
+
+def test_an_odd_key_is_just_a_wrong_key(phone: TestClient) -> None:
+    body = b'{"key":"\\ud800"}'
+    headers = {"Content-Type": "application/json"}
+    assert phone.post("/api/pair", content=body, headers=headers).status_code == 403
+
+
+def test_vite_is_only_a_page_of_nanar_in_development(controller: Controller) -> None:
+    network = Network(port=8642, addresses=list)
+    origin = {"origin": "http://localhost:5173"}
+    client = TestClient(create_app(controller, key=KEY, network=network), client=TV)
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect("ws://127.0.0.1:8642/api/live", headers=origin),
+    ):
+        pass
+    dev = TestClient(create_app(controller, key=KEY, network=network, dev=True), client=TV)
+    with dev.websocket_connect("ws://127.0.0.1:8642/api/live", headers=origin) as socket:
+        assert socket.receive_json()["type"] == "state"

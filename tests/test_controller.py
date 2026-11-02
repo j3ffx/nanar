@@ -1,3 +1,4 @@
+import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -565,3 +566,47 @@ def test_subtitles_already_there_are_shown_not_downloaded_twice(
     controller.find_subtitles()
     assert sessions.last.commands == [("sub", 7)]
     assert not subtitles.found
+
+
+def test_a_report_of_the_last_video_queued_during_a_next_is_dropped(
+    controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
+) -> None:
+    controller.play(video_id(library, "Saga"))
+    gate = threading.Event()
+    controller._worker.submit(gate.wait, 5)  # the worker busy, as under the lock of a next
+    sessions.last.report(position=1300.0, duration=2600.0)
+    sessions.last.finish()
+    controller.command("next")
+    gate.set()
+    controller._worker.submit(lambda: None).result(5)
+    assert controller.state()["playing"]["position"] == 0.0
+    assert controller.state()["upNext"] is None
+    assert progress.get("/films", "Saga/Saga 2 1992.mkv") is None
+
+
+def test_a_video_still_opening_never_overwrites_where_it_was_left(
+    controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
+) -> None:
+    progress.save("/films", "Seul 2001.mkv", 1200.0, 6000.0, finished=False)
+    controller.play(video_id(library, "Seul"))
+    sessions.last.report(position=0.0, duration=6000.0, started=False)
+    wait_for(lambda: controller.state()["playing"]["duration"] == 6000.0)
+    controller.command("stop")
+    entry = progress.get("/films", "Seul 2001.mkv")
+    assert entry is not None
+    assert entry.position == 1200.0
+
+
+def test_moving_back_from_the_end_with_mpvs_keys_stays_on_this_video(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 0.5)
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: controller.state()["upNext"])
+    sessions.last.callbacks.action("resumed")
+    wait_for(lambda: controller.state()["upNext"] is None)
+    assert not sessions.last.loaded

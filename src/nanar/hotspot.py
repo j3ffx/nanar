@@ -26,7 +26,7 @@ from nanar.system import powershell
 
 log = logging.getLogger(__name__)
 
-TIMEOUT = 40.0  # seconds: turning it on takes a few, PowerShell a second or two to start
+TIMEOUT = 60.0  # seconds: turning it on takes a few, PowerShell itself up to ten to start
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,7 @@ class Status:
             "on": self.on,
             "ssid": self.ssid if self.on else None,
             "code": self.code,
+            "checked": True,
         }
 
 
@@ -116,8 +117,19 @@ function WinRT($ns, $name) { "$ns.$name, $ns, ContentType = WindowsRuntime" -as 
 $info = WinRT 'Windows.Networking.Connectivity' 'NetworkInformation'
 $tm = WinRT 'Windows.Networking.NetworkOperators' 'NetworkOperatorTetheringManager'
 $result = WinRT 'Windows.Networking.NetworkOperators' 'NetworkOperatorTetheringOperationResult'
-$out = [ordered]@{ available = $false; on = $false; ssid = $null; passphrase = $null; code = $null }
+$out = [ordered]@{
+  available = $false; on = $false; was = $false; ssid = $null; passphrase = $null; code = $null
+}
 $profile = $info::GetInternetConnectionProfile()
+if ($null -eq $profile) {
+  # Internet gone: an open hotspot still hangs from one of the PC's connections, and must close.
+  foreach ($candidate in $info::GetConnectionProfiles()) {
+    try {
+      $state = $tm::CreateFromConnectionProfile($candidate).TetheringOperationalState
+      if ($state.ToString() -eq 'On') { $profile = $candidate }
+    } catch {}
+  }
+}
 if ($null -eq $profile) {
   $out.code = 'no_internet'
 } elseif ($tm::GetTetheringCapabilityFromConnectionProfile($profile).ToString() -ne 'Enabled') {
@@ -126,6 +138,7 @@ if ($null -eq $profile) {
   $m = $tm::CreateFromConnectionProfile($profile)
   $out.available = $true
   $state = $m.TetheringOperationalState.ToString()
+  $out.was = $state -eq 'On'
   if ($Action -eq 'on' -and $state -ne 'On') {
     $r = Await ($m.StartTetheringAsync()) $result
     if ($r.Status.ToString() -ne 'Success') { $out.code = 'failed' }
@@ -137,9 +150,11 @@ if ($null -eq $profile) {
     Start-Sleep -Milliseconds 500
   }
   $out.on = $m.TetheringOperationalState.ToString() -eq 'On'
-  $config = $m.GetCurrentAccessPointConfiguration()
-  $out.ssid = $config.Ssid
-  $out.passphrase = $config.Passphrase
+  if ($out.on) {  # Windows' password: only when it is open, for the page's QR code
+    $config = $m.GetCurrentAccessPointConfiguration()
+    $out.ssid = $config.Ssid
+    $out.passphrase = $config.Passphrase
+  }
 }
 $out | ConvertTo-Json -Compress
 """
@@ -150,6 +165,7 @@ class WindowsHotspot:
         self._lock = threading.Lock()
         self._last = Status(available=False)
         self._ours = False  # turned on by Nanar: turned off when it closes
+        self._was_on = False
 
     @property
     def last(self) -> Status:
@@ -160,11 +176,10 @@ class WindowsHotspot:
         return self._run("status")
 
     def turn(self, on: bool) -> Status:
-        before = self._run("status").on  # Windows' own switch may have moved since
         status = self._run("on" if on else "off")
         if status.code is not None:
             raise HotspotError(status.code)
-        if on and not before and status.on:
+        if on and not self._was_on and status.on:
             self._ours = True
         if not on:
             self._ours = False
@@ -173,7 +188,8 @@ class WindowsHotspot:
     def close(self) -> None:
         if self._ours:
             try:
-                self._run("off")
+                if self._run("off").on:
+                    log.warning("the hotspot Nanar opened is still open")
             except HotspotError:
                 log.warning("the hotspot Nanar opened could not be closed")
             self._ours = False
@@ -195,6 +211,7 @@ class WindowsHotspot:
                 # The output holds the password: it is not logged.
                 log.warning("the hotspot did not answer (%s)", action)
                 raise HotspotError("failed") from None
+            self._was_on = bool(raw.get("was"))  # what Windows' own switch said, before this
             if not raw:  # PowerShell failed, not the hotspot: this says nothing about it
                 log.warning("the hotspot did not answer (%s)", action)
                 raise HotspotError("failed")

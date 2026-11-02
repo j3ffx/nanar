@@ -4,7 +4,11 @@ Who may call what is decided in `security.py`; phones pair with the key the TV s
 """
 
 import asyncio
+import contextlib
+import hashlib
 import io
+import logging
+import time
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -23,11 +27,14 @@ from nanar.hotspot import HotspotError, NoHotspot, WindowsHotspot, wifi_qr
 from nanar.pairing import lan_addresses, remote_url
 from nanar.security import COOKIE, AccessMiddleware, Caller, key_matches
 
+log = logging.getLogger(__name__)
+
 TEN_YEARS = 10 * 365 * 24 * 3600
 LINKS = {
     "tmdb": "https://www.themoviedb.org/settings/api",
     "opensubtitles": "https://www.opensubtitles.com/consumers",
 }
+HOTSPOT_READ_EVERY = 20.0  # seconds
 TICK_SECONDS = 10.0  # at least this often, a phone hears from Nanar: silence means it is gone
 
 
@@ -53,8 +60,8 @@ class ViewFilter(BaseModel):
 
 
 class ViewBody(BaseModel):
-    path: str  # the TV page's path: "/" or "/g/<group>"
-    focus: str | None = None  # the video or group to put forward
+    path: str = Field(pattern=r"^/(g/[0-9a-f]+)?$")  # the TV page's: "/" or "/g/<group>"
+    focus: str | None = Field(default=None, max_length=64)  # the video or group to put forward
     filter: ViewFilter = Field(default_factory=ViewFilter)  # what the library shows
 
 
@@ -127,6 +134,9 @@ async def _run_command(controller: Controller, message: dict[str, Any], *, osd: 
         await asyncio.to_thread(controller.command, action, message.get("value"), osd=osd)
     except CommandError as error:
         return error.code
+    except Exception:  # a page's connection doesn't die of what a command met
+        log.exception("command %s", action)
+        return "not_ready"
     return None
 
 
@@ -156,14 +166,19 @@ def create_app(
     network: Network,
     desktop: Desktop | None = None,
     hotspot: WindowsHotspot | NoHotspot | None = None,
+    dev: bool = False,
 ) -> FastAPI:
     wifi = hotspot or NoHotspot()
     app = FastAPI(
         title="Nanar", version=__version__, docs_url=None, redoc_url=None, openapi_url=None
     )
-    app.add_middleware(AccessMiddleware, key=key)
+    app.add_middleware(AccessMiddleware, key=key, dev=dev)
     app.state.controller = controller
     phones: set[WebSocket] = set()
+    # Tells this Nanar from another on the same network, under the same name. Not a secret, and
+    # no proof either: it spares a phone from handing its key to the neighbour's Nanar by mistake.
+    instance = hashlib.blake2s(key.encode(), digest_size=6).hexdigest()
+    hotspot_read = [0.0]
 
     @app.exception_handler(CommandError)
     async def command_error(_: Any, error: CommandError) -> JSONResponse:
@@ -174,7 +189,8 @@ def create_app(
         # Readable from any page: the remote, opened by its IP address, asks whether
         # nanar.local answers before moving there. It says nothing but the version.
         response.headers["Access-Control-Allow-Origin"] = "*"
-        return {"version": __version__}
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        return {"version": __version__, "instance": instance}
 
     # Out of the server's own thread: reading a large library takes seconds, and everything
     # else (the phones' commands, the live state) must not wait for it.
@@ -254,12 +270,14 @@ def create_app(
         """What Windows says now: it closes a hotspot nobody uses, and has its own switch."""
         if not _caller(request).local:
             return JSONResponse({"code": "this_machine_only"}, status_code=403)
-        try:
-            status = await asyncio.to_thread(wifi.status)
-        except HotspotError:
-            status = wifi.last
-        controller.set_hotspot(status.public())
-        return status.public()
+        status = wifi.last
+        if time.monotonic() - hotspot_read[0] >= HOTSPOT_READ_EVERY:  # PowerShell takes seconds
+            hotspot_read[0] = time.monotonic()
+            with contextlib.suppress(HotspotError):
+                status = await asyncio.to_thread(wifi.status)
+            controller.set_hotspot(status.public())
+        # The password too, for a camera that doesn't read Wi-Fi codes: this machine's page only.
+        return {**status.public(), "passphrase": status.passphrase if status.on else None}
 
     @app.post("/api/hotspot", status_code=204, response_model=None)
     async def turn_hotspot(body: HotspotBody, request: Request) -> JSONResponse | None:
@@ -363,6 +381,7 @@ def create_app(
         name = network.name() if network.lan else None
         return {
             "lan": network.lan,
+            "instance": instance,
             "name": f"{name}:{network.port}" if name else None,
             "addresses": [f"{a}:{network.port}" for a in addresses],
             "url": remote_url(addresses[0], network.port, key) if addresses else None,

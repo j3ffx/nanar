@@ -129,6 +129,8 @@ class Controller:
         self._playback: Playback | None = None
         self._saved_at = 0.0  # the position last saved for the current video
         self._generation = 0  # tells a finished session's late callbacks from the current one's
+        self._play_seq = 0  # the same for a video that another replaced in the same session
+        self._scanning = False  # a folder is being read
         self._phones = 0
         self._library_version = 0
         self._up_next: Video | None = None
@@ -219,35 +221,37 @@ class Controller:
             }
 
     def library_json(self) -> dict[str, Any]:
-        """The library for the pages, with where each video was left."""
-        with self._lock:
-            data = self.library.to_json()
-            saved = self.progress.of_root(self.library.root)
-            for group_id in self.library.groups:
-                data["groups"][group_id]["thumb"] = self._thumb_url("g", group_id)
-                info = self.metadata.of_group(self.library, group_id) if self.metadata else None
-                data["groups"][group_id]["overview"] = (info or {}).get("overview") or None
-            for video in self.library.videos.values():
-                data["videos"][video.id]["thumb"] = self._thumb_url("v", video.id)
-                info = self.metadata.of_video(self.library, video) if self.metadata else None
-                data["videos"][video.id]["overview"] = (info or {}).get("overview") or None
-                entry = saved.get(video.path)
-                data["videos"][video.id]["progress"] = (
-                    {
-                        "position": entry.position,
-                        "duration": entry.duration,
-                        "watched": entry.watched,
-                    }
-                    if entry
-                    else None
-                )
-            data["continue"] = to_continue(self.library, saved)
-            data["recent"] = [
-                {"kind": kind, "id": ident}
-                for kind, ident in recent(self.library, time.time())
-                if kind == "group" or not _watched(saved, self.library.videos[ident].path)
-            ]
-            return data
+        """The library for the pages, with where each video was left. Without the lock: a large
+        library takes a while, and what plays must not wait for it."""
+        library = self.library
+        data = library.to_json()
+        data["scanning"] = self._scanning
+        saved = self.progress.of_root(library.root)
+        for group_id in library.groups:
+            data["groups"][group_id]["thumb"] = self._thumb_url("g", group_id)
+            info = self.metadata.of_group(library, group_id) if self.metadata else None
+            data["groups"][group_id]["overview"] = (info or {}).get("overview") or None
+        for video in library.videos.values():
+            data["videos"][video.id]["thumb"] = self._thumb_url("v", video.id)
+            info = self.metadata.of_video(library, video) if self.metadata else None
+            data["videos"][video.id]["overview"] = (info or {}).get("overview") or None
+            entry = saved.get(video.path)
+            data["videos"][video.id]["progress"] = (
+                {
+                    "position": entry.position,
+                    "duration": entry.duration,
+                    "watched": entry.watched,
+                }
+                if entry
+                else None
+            )
+        data["continue"] = to_continue(library, saved)
+        data["recent"] = [
+            {"kind": kind, "id": ident}
+            for kind, ident in recent(library, time.time())
+            if kind == "group" or not _watched(saved, library.videos[ident].path)
+        ]
+        return data
 
     def thumbnail(self, kind: str, ident: str) -> Path | None:
         """The picture of a video ("v") or of a saga or series ("g"), if there is one."""
@@ -296,6 +300,13 @@ class Controller:
                 "filter": dict(filter or NO_FILTER),
                 "seq": self._view["seq"] + 1,
             }
+        self._announce()
+
+    def set_scanning(self, scanning: bool) -> None:
+        """A folder is being read: the pages say so rather than "nothing here"."""
+        with self._lock:
+            self._scanning = scanning
+            self._library_version += 1
         self._announce()
 
     def set_integration_offer(self, offer: bool) -> None:
@@ -350,6 +361,7 @@ class Controller:
             if start is None:
                 entry = self.progress.get(self.library.root, video.path)
                 start = entry.resume_at() if entry else 0.0
+            self._play_seq += 1
             self._video = video
             self._video_root = self.library.root
             self._saved_at = start
@@ -387,12 +399,13 @@ class Controller:
                     muted=was.muted,
                     sub_delay=was.sub_delay,
                     sub_scale=was.sub_scale,
+                    started=False,
                 )
                 self._session.load(begin)
             else:
                 rect = self.window.rect()
                 self._generation += 1
-                self._playback = Playback(fullscreen=self.settings.fullscreen)
+                self._playback = Playback(fullscreen=self.settings.fullscreen, started=False)
                 self._session = self._sessions(
                     dataclasses.replace(begin, rect=rect),
                     self.settings,
@@ -561,7 +574,10 @@ class Controller:
         with self._lock:
             self._night = not self._night if night is None else night
             if self._session is not None:
-                self._session.command("night", self._night, osd=osd)
+                try:
+                    self._session.command("night", self._night, osd=osd)
+                except Exception as error:  # mpv refuses while a file opens, or as it closes
+                    raise CommandError("not_ready") from error
         self._announce()
 
     def set_sleep(self, value: Any) -> None:
@@ -661,7 +677,10 @@ class Controller:
             self.settings.fullscreen = value
             self._save_settings()
             if self._session is not None:
-                self._session.command("fullscreen", value)
+                try:
+                    self._session.command("fullscreen", value)
+                except Exception as error:  # mpv refuses while a file opens, or as it closes
+                    raise CommandError("not_ready") from error
             else:
                 self.window.set_fullscreen(value)
         self._announce()
@@ -677,9 +696,11 @@ class Controller:
     # From the session (mpv's threads) ----------------------------------------------------------
 
     def _session_changed(self, generation: int, playback: Playback) -> None:
+        seq = self._play_seq  # what was playing when mpv said this
+
         def run() -> None:
             with self._lock:
-                if generation != self._generation or self._session is None:
+                if generation != self._generation or seq != self._play_seq or self._session is None:
                     return
                 self._playback = playback
                 if playback.fullscreen != self.settings.fullscreen:
@@ -695,15 +716,22 @@ class Controller:
         def run() -> None:
             if generation != self._generation:
                 return
+            if name == "resumed":  # moved back from the end: stay on this video
+                with self._lock:
+                    self._cancel_up_next()
+                self._announce()
+                return
             with contextlib.suppress(CommandError):  # "next" on the last episode: nothing to do
                 self.command(name)
 
         self._worker.submit(run)
 
     def _session_finished(self, generation: int) -> None:
+        seq = self._play_seq
+
         def run() -> None:
             with self._lock:
-                if generation != self._generation or self._video is None:
+                if generation != self._generation or seq != self._play_seq or self._video is None:
                     return
                 self._save_current(finished=True)
                 self._library_version += 1
@@ -773,8 +801,12 @@ class Controller:
         with self._lock:
             if generation != self._generation or self._up_next is not following:
                 return
-        with contextlib.suppress(CommandError):
+        try:
             self.play(following.id, start=0.0)
+        except CommandError:  # gone from the folder in the meantime
+            with self._lock:
+                self._cancel_up_next()
+            self._announce()
 
     def _cancel_up_next(self) -> None:
         if self._countdown is not None:
@@ -792,7 +824,7 @@ class Controller:
         if self._video is None or self._playback is None:
             return
         p = self._playback
-        if not finished and p.position <= 0 and p.duration is None:
+        if not finished and not p.started:
             return  # nothing played yet: keep what was saved before
         self.progress.save(
             self._video_root, self._video.path, p.position, p.duration, finished=finished

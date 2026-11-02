@@ -12,6 +12,7 @@ The checksum catches a damaged download, not a compromised release: both come fr
 """
 
 import hashlib
+import http.client
 import json
 import logging
 import os
@@ -30,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from nanar import __version__
-from nanar.online import OnlineError, Request, fetch
+from nanar.online import OnlineError, Request, fetch, https_opener
 from nanar.system import powershell
 
 REPO = "j3ffx/nanar"
@@ -40,6 +41,7 @@ CHECK_EVERY = 24 * 3600
 WAKE_EVERY = 3600.0  # how often the background thread looks whether a day has passed
 MAX_UNZIPPED = 2_000_000_000  # bytes: far more than a build, far less than a full disk
 ANSWER_WITHIN = 45  # seconds the new version has to answer before the old one comes back
+SETTLE = 10  # seconds it must then stay up (a crash when its window opens comes after the answer)
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ class Release:
 
 
 class UpdateError(Exception):
-    """`code`: "offline", "bad_checksum", "update_failed", "not_supported"."""
+    """`code`: "offline", "bad_checksum", "update_failed", "not_supported", "not_alone"."""
 
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -80,11 +82,34 @@ def release_of(data: dict[str, Any]) -> Release | None:
 
 def _download(url: str, target: Path) -> None:
     raw = urllib.request.Request(url, headers={"User-Agent": f"Nanar v{__version__}"})
+    written = 0
     try:
-        with urllib.request.urlopen(raw, timeout=60) as response, target.open("wb") as out:
-            shutil.copyfileobj(response, out, 1 << 20)
-    except (urllib.error.URLError, TimeoutError, OSError):
+        with https_opener.open(raw, timeout=60) as response, target.open("wb") as out:
+            while block := response.read(1 << 20):
+                written += len(block)
+                if written > MAX_UNZIPPED:
+                    raise UpdateError("update_failed")
+                out.write(block)
+    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError, OnlineError):
         raise UpdateError("offline") from None
+
+
+def _self_check(exe: Path) -> None:
+    """The new version loads its window's toolkit and libmpv, before anything is touched."""
+    try:
+        done = subprocess.run(
+            [str(exe), "--self-check"],
+            timeout=180,
+            cwd=exe.parent,
+            check=False,
+            capture_output=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise UpdateError("update_failed") from error
+    if done.returncode != 0:
+        log.warning("the new version does not start: exit code %s", done.returncode)
+        raise UpdateError("update_failed")
 
 
 # Waits for Nanar to close, swaps its folder for the new one, and starts it; brings the old one
@@ -93,7 +118,7 @@ def _download(url: str, target: Path) -> None:
 SWAP = r"""
 param(
   [int]$ProcessId, [string]$New, [string]$Target, [string]$Version, [int]$Port,
-  [int]$AnswerWithin = 45
+  [int]$AnswerWithin = 45, [string]$Flags = '', [int]$Settle = 10
 )
 $ErrorActionPreference = 'Stop'
 $old = "$Target.old"
@@ -104,7 +129,7 @@ function Start-Nanar {
   $info = New-Object Diagnostics.ProcessStartInfo
   $info.FileName = "$Target\Nanar.exe"
   $info.WorkingDirectory = $Target
-  $info.Arguments = "--port $Port"
+  $info.Arguments = "--port $Port $Flags"
   $info.UseShellExecute = $true
   [Diagnostics.Process]::Start($info)
 }
@@ -122,8 +147,13 @@ function Answers {
 }
 
 try { Wait-Process -Id $ProcessId -Timeout 120 } catch {}
-if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Recurse -Force }
-if (-not (Rename-Retrying $Target $old)) { Start-Nanar | Out-Null; exit 1 }
+try {
+  if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Recurse -Force }
+} catch {}
+if ((Test-Path -LiteralPath $old) -or -not (Rename-Retrying $Target $old)) {
+  Start-Nanar | Out-Null
+  exit 1
+}
 $started = $null
 $fine = Rename-Retrying $New $Target
 if ($fine) {
@@ -136,13 +166,19 @@ if ($fine) {
     $fine = Answers
   }
 }
+if ($fine -and $Settle -gt 0) {  # answering isn't all: it must still be there a moment later
+  Start-Sleep -Seconds $Settle
+  $fine = -not $started.HasExited
+}
 if (-not $fine) {
   if ($started) { try { Stop-Process -Id $started.Id -Force } catch {} }
   Start-Sleep -Seconds 1
   if (Test-Path -LiteralPath $Target) {
-    try { Remove-Item -LiteralPath $Target -Recurse -Force } catch {}
+    # Aside rather than deleted: a file still held would leave half of it, and no way back.
+    [void](Rename-Retrying $Target "$Target.failed")
   }
   if (Rename-Retrying $old $Target) { Start-Nanar | Out-Null }
+  try { Remove-Item -LiteralPath "$Target.failed" -Recurse -Force } catch {}
   exit 1
 }
 Remove-Item -LiteralPath $old -Recurse -Force -ErrorAction SilentlyContinue
@@ -160,6 +196,7 @@ class Updates:
         on_change: Callable[[], None],
         get: Callable[[Request], bytes] = fetch,
         download: Callable[[str, Path], None] = _download,
+        self_check: Callable[[Path], None] = _self_check,
         supported: bool | None = None,
     ) -> None:
         self._enabled = enabled
@@ -168,6 +205,7 @@ class Updates:
         self._on_change = on_change
         self._get = get
         self._download = download
+        self._self_check = self_check
         self.supported = (
             supported
             if supported is not None
@@ -232,7 +270,7 @@ class Updates:
         self._on_change()
         return self.available
 
-    def prepare(self, install: Path, port: int) -> list[str]:
+    def prepare(self, install: Path, port: int, flags: str = "") -> list[str]:
         """Downloads, checks and unzips the new version next to `install` (Nanar's folder), and
         gives the command that swaps them once Nanar has closed."""
         release = self.available
@@ -243,11 +281,11 @@ class Updates:
         self.installing = True
         self._on_change()
         try:
-            return self._prepare(release, install, port)
+            return self._prepare(release, install, port, flags)
         except UpdateError:
             self.cancelled()
             raise
-        except (OSError, ValueError, zipfile.BadZipFile) as error:
+        except Exception as error:  # whatever it was, Nanar goes on as it was
             log.warning("the update failed: %s", error)
             self.cancelled()
             raise UpdateError("update_failed") from error
@@ -259,7 +297,16 @@ class Updates:
             self._install_lock.release()
         self._on_change()
 
-    def _prepare(self, release: Release, install: Path, port: int) -> list[str]:
+    def _prepare(self, release: Release, install: Path, port: int, flags: str) -> list[str]:
+        # The swap renames this folder, then deletes it: it must hold Nanar and nothing else, and
+        # `.old` must not be somebody's. (Nanar.exe dropped among one's films is not impossible.)
+        if not _is_only_nanar(install):
+            log.warning("%s holds more than Nanar: not touching it", install)
+            raise UpdateError("not_alone")
+        old = install.with_name(f"{install.name}.old")
+        if old.exists() and not _is_only_nanar(old):
+            log.warning("%s is not an old Nanar: not touching it", old)
+            raise UpdateError("not_alone")
         work = install.parent / f"{install.name}.update"
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir(parents=True)
@@ -286,9 +333,17 @@ class Updates:
         if not (unzipped / "Nanar" / "Nanar.exe").is_file():
             raise UpdateError("update_failed")
         archive.unlink()
+        self._self_check(unzipped / "Nanar" / "Nanar.exe")
         script = work / "swap.ps1"
         script.write_text(SWAP, encoding="utf-8")
-        return swap_command(script, os.getpid(), unzipped / "Nanar", install, release.version, port)
+        return swap_command(
+            script, os.getpid(), unzipped / "Nanar", install, release.version, port, flags=flags
+        )
+
+
+def _is_only_nanar(folder: Path) -> bool:
+    """What the build unzips, and nothing else."""
+    return {entry.name.lower() for entry in folder.iterdir()} <= {"nanar.exe", "_internal"}
 
 
 def swap_command(
@@ -299,6 +354,8 @@ def swap_command(
     version: str,
     port: int,
     answer_within: int = ANSWER_WITHIN,
+    settle: int = SETTLE,
+    flags: str = "",
 ) -> list[str]:
     return [
         powershell(),
@@ -320,6 +377,9 @@ def swap_command(
         str(port),
         "-AnswerWithin",
         str(answer_within),
+        "-Settle",
+        str(settle),
+        *(["-Flags", flags] if flags else []),
     ]
 
 

@@ -78,10 +78,10 @@ class Announcer:
     def start(self) -> None:
         try:
             self._zeroconf = self._make()
-        except OSError as error:  # port 5353 unavailable: the IP address still works
+            self._refresh()
+        except OSError as error:  # port 5353 unavailable: the IP address works, tried again later
             log.warning("mDNS unavailable, no %s: %s", HOST, error)
-            return
-        self._refresh()
+            self._zeroconf = None
         self._thread = threading.Thread(target=self._watch, name="nanar-mdns", daemon=True)
         self._thread.start()
 

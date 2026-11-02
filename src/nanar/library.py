@@ -8,11 +8,13 @@ season and episode), then groups what belongs together:
 Everything else is a film on its own. Nothing is fetched from the Internet.
 """
 
+import functools
 import hashlib
 import os
 import re
 import sys
 import unicodedata
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -98,6 +100,10 @@ class Library:
     root: str
     videos: dict[str, Video] = field(default_factory=dict)
     groups: dict[str, Group] = field(default_factory=dict)
+    # What each folder holds, read once for this reading of the library (thumbnails.py).
+    listings: dict[str, dict[str, str]] = field(default_factory=dict, repr=False, compare=False)
+    # How many videos each folder holds.
+    counts: Counter[str] = field(default_factory=Counter, repr=False, compare=False)
 
     def entries(self) -> list[tuple[Literal["video", "group"], str]]:
         """The top level, sorted by title: groups, and the videos that belong to none."""
@@ -206,14 +212,20 @@ def _attach(library: Library, group: Group, videos: list[Video]) -> None:
     library.groups[group.id] = group
 
 
+@functools.lru_cache(maxsize=50_000)
+def _guess(name: str) -> dict[str, Any]:
+    """guessit takes about 25 ms a name, and a new reading of a folder mostly finds the same."""
+    return dict(guessit(name))
+
+
 def _read(path: str) -> Video:
     pure = PurePosixPath(path)
     name = pure.name
     # The file name alone: a parent folder's release tags would mislead guessit. A season
     # folder ("Saison 1/Kaamelott - 03.avi") is the exception, as it holds the season number.
-    guess: dict[str, Any] = dict(guessit(name))
+    guess = _guess(name)
     if guess.get("type") == "episode" and guess.get("season") is None and len(pure.parts) > 1:
-        with_folder: dict[str, Any] = dict(guessit(f"{pure.parent.name}/{name}"))
+        with_folder = _guess(f"{pure.parent.name}/{name}")
         if with_folder.get("season") is not None:
             guess = with_folder
     title = _first_str(guess.get("title")) or _clean(pure.stem)

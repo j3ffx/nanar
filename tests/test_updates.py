@@ -56,6 +56,7 @@ def make(answer: object, *, files: dict[str, bytes] | None = None) -> tuple[Upda
         on_change=lambda: None,
         get=get,
         download=download,
+        self_check=lambda exe: None,
         supported=True,
     )
     return found, checked
@@ -166,7 +167,7 @@ def fake_install(root: Path) -> tuple[Path, Path, Path]:
 def run_swap(target: Path, new: Path, script: Path, port: int, within: int) -> None:
     gone = subprocess.Popen([sys.executable, "-c", "pass"])
     gone.wait()
-    command = updates.swap_command(script, gone.pid, new, target, "0.5.0", port, within)
+    command = updates.swap_command(script, gone.pid, new, target, "0.5.0", port, within, settle=0)
     subprocess.run(command, check=False, timeout=90, cwd=target.parent)
 
 
@@ -205,3 +206,19 @@ def test_the_swap_brings_the_old_version_back_when_the_new_one_does_not_answer(
     assert (target / "which.txt").read_text() == "old"
     assert (target / "Nanar.exe").is_file()
     assert not target.with_name("Nanar.old").exists()
+
+
+def test_never_touches_a_folder_holding_more_than_nanar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(updates, "__version__", "0.4.0")
+    found, _ = make(github("0.5.0"))
+    found.check()
+    films = tmp_path / "Films"
+    films.mkdir()
+    (films / "Nanar.exe").write_bytes(b"exe")
+    (films / "Mon film.mkv").write_bytes(b"")
+    with pytest.raises(UpdateError, match="not_alone"):
+        found.prepare(films, 8642)
+    assert not found.state()["installing"]
+    assert (films / "Mon film.mkv").exists()

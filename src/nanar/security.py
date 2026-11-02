@@ -25,10 +25,12 @@ COOKIE = "nanar_key"
 LOOPBACK_NAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 OPEN_API = frozenset({("GET", "/api/health"), ("POST", "/api/pair")})
-DEV_ORIGINS = frozenset({"localhost:5173", "127.0.0.1:5173"})
+DEV_ORIGINS = frozenset({"http://localhost:5173", "http://127.0.0.1:5173"})
+MAX_BODY = 64 * 1024  # bytes: far more than any request of the pages needs
 HARDENING = (
     (b"content-security-policy", b"frame-ancestors 'none'"),
     (b"x-content-type-options", b"nosniff"),
+    (b"cross-origin-resource-policy", b"same-origin"),
 )
 
 
@@ -64,7 +66,9 @@ def caller_of(scope: Scope, key: str) -> Caller:
 
 
 def key_matches(presented: str | None, key: str) -> bool:
-    return presented is not None and hmac.compare_digest(presented.encode(), key.encode())
+    return presented is not None and hmac.compare_digest(
+        presented.encode("utf-8", "replace"), key.encode()
+    )
 
 
 def _presented_key(headers: Headers) -> str | None:
@@ -79,9 +83,10 @@ def _presented_key(headers: Headers) -> str | None:
 
 
 class AccessMiddleware:
-    def __init__(self, app: ASGIApp, *, key: str) -> None:
+    def __init__(self, app: ASGIApp, *, key: str, dev: bool = False) -> None:
         self.app = app
         self.key = key
+        self.dev = dev
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
@@ -89,8 +94,17 @@ class AccessMiddleware:
             return
         caller = caller_of(scope, self.key)
         scope.setdefault("state", {})["caller"] = caller
-        problem = _problem(scope, Headers(scope=scope), caller)
+        problem = _problem(scope, Headers(scope=scope), caller, dev=self.dev)
         if problem is None:
+            received = 0
+
+            async def limited() -> Message:
+                nonlocal received
+                message = await receive()
+                received += len(message.get("body", b""))
+                if received > MAX_BODY:  # no announced length: count as it comes
+                    return {"type": "http.disconnect"}
+                return message
 
             async def hardened(message: Message) -> None:
                 if message["type"] == "http.response.start":
@@ -99,7 +113,7 @@ class AccessMiddleware:
                     message["headers"] = [*message.get("headers", []), *HARDENING]
                 await send(message)
 
-            await self.app(scope, receive, hardened)
+            await self.app(scope, limited if scope["type"] == "http" else receive, hardened)
             return
         if scope["type"] == "websocket":
             await send({"type": "websocket.close", "code": 1008})
@@ -119,22 +133,37 @@ class AccessMiddleware:
         await send({"type": "http.response.body", "body": body})
 
 
-def _same_origin(origin: str, host: str) -> bool:
+def _same_origin(origin: str, host: str, *, dev: bool) -> bool:
     """A page's own origin, port included; or the pages served by Vite, in development."""
-    there = origin.split("://")[-1]
-    return there == host or there in DEV_ORIGINS
+    if dev and origin in DEV_ORIGINS:
+        return True
+    return origin.split("://")[-1] == host
 
 
-def _problem(scope: Scope, headers: Headers, caller: Caller) -> tuple[int, str] | None:
+def _problem(
+    scope: Scope, headers: Headers, caller: Caller, *, dev: bool
+) -> tuple[int, str] | None:
     path: str = scope["path"]
     if scope["type"] == "websocket":
         if not (caller.local or caller.paired):
             return 401, "pairing_required"
         origin = headers.get("origin")
-        if origin is not None and not _same_origin(origin, headers.get("host", "")):
+        if origin is not None and not _same_origin(origin, headers.get("host", ""), dev=dev):
             return 403, "forbidden_origin"
         return None
     method: str = scope["method"]
+    announced = headers.get("content-length", "0")
+    if announced.isdigit() and int(announced) > MAX_BODY:
+        return 413, "too_large"
+    # A browser says when another site asks: its pictures can't probe the API as "this machine"
+    # (whether a title is in the library, from a thumbnail's address). Vite, in development, is
+    # another port but the same site. /api/health stays open: the page asks it across addresses.
+    if (
+        path.startswith("/api/")
+        and path != "/api/health"
+        and headers.get("sec-fetch-site", "same-origin") not in ("same-origin", "same-site", "none")
+    ):
+        return 403, "forbidden_origin"
     if method not in SAFE_METHODS and not headers.get("content-type", "").startswith(
         "application/json"
     ):

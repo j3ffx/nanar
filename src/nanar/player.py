@@ -94,6 +94,7 @@ class Playback:
     sub_delay: float = 0.0
     sub_scale: float = 1.0
     night: bool = False
+    started: bool = True  # it has reported a position: until then, it isn't worth saving
     chapter: int | None = None  # from 0
     chapters: int = 0
     audio: list[Track] = field(default_factory=list)
@@ -216,7 +217,9 @@ def libmpv_dirs() -> list[Path]:
 
 def _load_mpv() -> Any:
     for directory in libmpv_dirs():
-        os.environ["PATH"] = f"{directory}{os.pathsep}{os.environ.get('PATH', '')}"
+        path = os.environ.get("PATH", "")
+        if str(directory) not in path.split(os.pathsep):  # called for each picture: once is enough
+            os.environ["PATH"] = f"{directory}{os.pathsep}{path}"
     import mpv  # type: ignore[import-untyped]  # python-mpv ships no type information
 
     return mpv
@@ -233,7 +236,7 @@ class MpvSession:
         self._ids = mpv.MpvEventID
         self._end_file = mpv.MpvEventEndFile
         self._callbacks = callbacks
-        self._playback = Playback(fullscreen=start.fullscreen)
+        self._playback = Playback(fullscreen=start.fullscreen, started=False)
         self._start = start
         self._placed = False
         self._ended = False  # `ended` was called (it is called once)
@@ -241,6 +244,7 @@ class MpvSession:
         self._terminated = False
         self._picked = False  # the start's picks were applied to this video's tracks
         self._loading = False  # another video was asked for, and hasn't started yet
+        self._load_seen = False  # mpv has begun on it: a restart now can't be from the last one
         self._last_rect: Rect | None = start.rect
         options: dict[str, Any] = {
             "title": f"{start.title} — Nanar",
@@ -301,6 +305,7 @@ class MpvSession:
         self._at_end = False
         self._picked = False
         self._loading = True
+        self._load_seen = False
         # mpv keeps these from one file to the next, and says nothing as they don't change.
         self._playback = Playback(
             fullscreen=self._playback.fullscreen,
@@ -309,6 +314,7 @@ class MpvSession:
             sub_delay=self._playback.sub_delay,
             sub_scale=self._playback.sub_scale,
             night=self._playback.night,
+            started=False,
         )
         self._mpv["title"] = f"{start.title} — Nanar"
         # Options of this file only. At the end of the previous one, mpv paused on its last
@@ -323,7 +329,10 @@ class MpvSession:
         message: str | None = None
         match action:
             case "pause":
-                m.pause = bool(value) if value is not None else not m.pause
+                pause = bool(value) if value is not None else not m.pause
+                if not pause and self._at_end:  # nothing left to play: from the start again
+                    m.command("seek", 0, "absolute")
+                m.pause = pause
                 message = "Pause" if m.pause else "Lecture"
             case "seek" | "seek_to":
                 m.command("seek", float(value), "relative" if action == "seek" else "absolute")
@@ -432,6 +441,7 @@ class MpvSession:
                 # While another video opens, mpv still reports where the last one was.
                 if value is None or self._loading:
                     return
+                p.started = True
                 if not self._placed:
                     self._place()
                 # Seconds are enough for the phone: skip the many updates in between.
@@ -472,8 +482,11 @@ class MpvSession:
             case "eof-reached":
                 if value:
                     self._reached_end()
-                else:  # moved back from the end: reaching it again is a new end
+                elif self._at_end and not self._loading:
+                    # Moved back from the end, here or with mpv's keys: no next video for now,
+                    # and reaching the end again is a new end.
                     self._at_end = False
+                    self._callbacks.action("resumed")
                 return
         if p is self._playback:  # not the last video's, if another just started
             self._callbacks.changed(p)
@@ -504,8 +517,12 @@ class MpvSession:
         if self._ended or self._terminated:
             return
         kind = event.event_id.value
-        if kind == self._ids.PLAYBACK_RESTART:
-            self._loading = False
+        if kind == self._ids.START_FILE:
+            self._load_seen = True
+        elif kind == self._ids.PLAYBACK_RESTART:
+            # A seek just before the load also ends with a restart: that one says nothing.
+            if self._load_seen:
+                self._loading = False
         elif kind == self._ids.END_FILE:
             reason = event.data.reason
             if reason == self._end_file.EOF:

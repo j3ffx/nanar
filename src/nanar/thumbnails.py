@@ -8,6 +8,7 @@ pixels wide, into the data directory, one video at a time in the background.
 
 import hashlib
 import logging
+import os
 import shutil
 import tempfile
 import threading
@@ -129,26 +130,43 @@ def local_poster(library: Library, video: Video) -> Path | None:
     """A picture the user put next to the video, or in its folder when it is alone there."""
     if "://" in video.path:
         return None
-    file = Path(library.root) / video.path
+    file = PurePosixPath(video.path)
+    folder = file.parent
+    names = _names_in(library, folder)
     for suffix in POSTER_SUFFIXES:
         for extension in POSTER_EXTENSIONS:
-            candidate = file.with_name(file.stem + suffix + extension)
-            if candidate.is_file():
-                return candidate
-    folder = PurePosixPath(video.path).parent
-    alone = sum(1 for v in library.videos.values() if PurePosixPath(v.path).parent == folder) == 1
+            found = names.get((file.stem + suffix + extension).lower())
+            if found is not None:
+                return Path(library.root) / folder / found
+    if not library.counts:
+        library.counts.update(str(PurePosixPath(v.path).parent) for v in library.videos.values())
+    alone = library.counts[str(folder)] == 1
     return _folder_poster(library, folder) if alone and str(folder) != "." else None
+
+
+def _names_in(library: Library, folder: PurePosixPath) -> dict[str, str]:
+    """The files of a folder, by their lowered names: read once for this reading of the library
+    (a new poster brings a new reading), rather than up to sixteen looks per video."""
+    names = library.listings.get(str(folder))
+    if names is None:
+        try:
+            with os.scandir(Path(library.root) / folder) as entries:
+                names = {e.name.lower(): e.name for e in entries if e.is_file()}
+        except OSError:
+            names = {}
+        library.listings[str(folder)] = names
+    return names
 
 
 def _folder_poster(library: Library, folder: PurePosixPath) -> Path | None:
     if str(folder) in (".", "") or "://" in str(folder):
         return None
-    base = Path(library.root) / folder
+    names = _names_in(library, folder)
     for name in FOLDER_POSTERS:
         for extension in POSTER_EXTENSIONS:
-            candidate = base / (name + extension)
-            if candidate.is_file():
-                return candidate
+            found = names.get(name + extension)
+            if found is not None:
+                return Path(library.root) / folder / found
     return None
 
 

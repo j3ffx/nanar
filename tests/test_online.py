@@ -89,8 +89,10 @@ def test_opensubtitles_prefers_the_release_timed_for_this_video() -> None:
 def test_opensubtitles_downloads_through_the_link_it_gives() -> None:
     net = Answers(
         {
-            "https://api.opensubtitles.com/api/v1/download": {"link": "https://dl.example/1.srt"},
-            "https://dl.example/1.srt": b"1\n00:00:01,000 --> 00:00:02,000\nBonjour\n",
+            "https://api.opensubtitles.com/api/v1/download": {
+                "link": "https://dl.opensubtitles.com/1.srt"
+            },
+            "https://dl.opensubtitles.com/1.srt": b"1\n00:00:01,000 --> 00:00:02,000\nBonjour\n",
         }
     )
     assert OpenSubtitles("key", net).download(5).startswith(b"1\n")
@@ -156,8 +158,10 @@ def test_subtitles_are_downloaded_once_into_the_data_directory(tmp_path: Path) -
             "https://api.opensubtitles.com/api/v1/subtitles": {
                 "data": [{"attributes": {"files": [{"file_id": 9}]}}]
             },
-            "https://api.opensubtitles.com/api/v1/download": {"link": "https://dl.example/9"},
-            "https://dl.example/9": b"srt",
+            "https://api.opensubtitles.com/api/v1/download": {
+                "link": "https://dl.opensubtitles.com/9"
+            },
+            "https://dl.opensubtitles.com/9": b"srt",
         }
     )
     subtitles = Subtitles(tmp_path, make=lambda k: OpenSubtitles(k, net))
@@ -201,3 +205,12 @@ def test_only_https_is_fetched() -> None:
     for url in ("http://dl.test/x", "file:///C:/Windows/win.ini"):
         with pytest.raises(OnlineError):
             online.fetch(Request(url, {}))
+
+
+def test_an_answer_does_not_choose_where_the_pc_connects() -> None:
+    net = Answers(
+        {"https://api.opensubtitles.com/api/v1/download": {"link": "https://evil.test/x"}}
+    )
+    with pytest.raises(OnlineError):
+        OpenSubtitles("key", net).download(5)
+    assert len(net.asked) == 1

@@ -72,6 +72,9 @@ def open_folder(
         remove_integration()
         return
     if port_taken(port):
+        if new_key:  # it would do nothing, and someone worried about the code must know
+            say("Ferme d'abord Nanar : le code de la télécommande n'a pas changé.")
+            return
         hand_over(port, folder)
         return
 
@@ -129,6 +132,7 @@ def open_folder(
         settings.save(settings_path)
 
     updates = Updates(
+        supported=False if demo else None,
         enabled=lambda: settings.check_updates,
         checked_at=lambda: settings.update_checked_at,
         mark_checked=mark_checked,
@@ -140,20 +144,38 @@ def open_folder(
         thumbnails.schedule(library)
     metadata.schedule(library)
     folders = Folders(controller, settings, None if demo else settings_path)
-    if not demo:
-        chosen = folder or (Path(settings.last_folder) if settings.last_folder else None)
-        if chosen is not None:
-            try:
-                folders.open(chosen)
-            except CommandError:
-                print(f"{chosen} n'est pas un dossier : choisis-en un sur la télé.")
-    print(f"Nanar {__version__} : {len(controller.library.videos)} vidéo(s)")
+    print(f"Nanar {__version__}")
 
-    def check_hotspot() -> None:  # a second or two (PowerShell): not in the way of the start
+    def open_first_folder() -> None:
+        # Behind the server and the window: a large folder takes a while to read, and Nanar must
+        # answer (a second launch, the one-click update's check) and show itself meanwhile.
+        chosen = folder or (Path(settings.last_folder) if settings.last_folder else None)
+        if demo or chosen is None:
+            return
+        try:
+            folders.open(chosen)
+        except CommandError:
+            print(f"{chosen} n'est pas un dossier : choisis-en un sur la télé.")
+        print(f"{len(controller.library.videos)} vidéo(s)")
+
+    if not demo and (folder or settings.last_folder):
+        controller.set_scanning(True)
+    threading.Thread(target=open_first_folder, name="nanar-open", daemon=True).start()
+
+    HOTSPOT_WATCH_SECONDS = 60.0
+
+    def watch_hotspot() -> None:
+        # PowerShell takes up to ten seconds: not in the way of the start. Then, while it is open,
+        # now and then: Windows closes a hotspot nobody uses, and the QR code must follow.
         with contextlib.suppress(hotspot.HotspotError):
             controller.set_hotspot(wifi.status().public())
+        while not hotspot_stop.wait(HOTSPOT_WATCH_SECONDS):
+            if wifi.last.on:
+                with contextlib.suppress(hotspot.HotspotError):
+                    controller.set_hotspot(wifi.status().public())
 
-    threading.Thread(target=check_hotspot, name="nanar-hotspot", daemon=True).start()
+    hotspot_stop = threading.Event()
+    threading.Thread(target=watch_hotspot, name="nanar-hotspot", daemon=True).start()
 
     app_holder: list[Desktop] = []
     app = create_app(
@@ -162,6 +184,7 @@ def open_folder(
         network=network,
         desktop=_LazyDesktop(app_holder),
         hotspot=wifi,
+        dev=dev,
     )
     server = uvicorn.Server(
         uvicorn.Config(
@@ -182,6 +205,7 @@ def open_folder(
             updates.stop,
             folders.stop,
             announcer.stop,
+            hotspot_stop.set,
             wifi.close,
         ):
             try:  # one that fails must not leave the others, the hotspot above all, running
@@ -201,7 +225,7 @@ def open_folder(
     page = "http://localhost:5173/tv" if dev else f"http://127.0.0.1:{port}/tv"
     window = TvWindow(page, fullscreen=settings.fullscreen)
     controller.window = window
-    app_holder.append(Desktop(controller, folders, window, settings, settings_path, port))
+    app_holder.append(Desktop(controller, folders, window, settings, settings_path, port, local))
     if offers_integration(settings):
         controller.set_integration_offer(True)
     thread = threading.Thread(target=server.run, name="nanar-server", daemon=True)
@@ -225,8 +249,10 @@ class Desktop:
         settings: Settings,
         settings_path: Path,
         port: int,
+        local: bool,
     ) -> None:
         self._port = port
+        self._local = local
         self._controller = controller
         self._folders = folders
         self._window = window
@@ -258,7 +284,8 @@ class Desktop:
             raise CommandError("not_supported")
         try:
             install = Path(sys.executable).parent
-            command = self._controller.updates.prepare(install, self._port)
+            flags = "--local" if self._local else ""  # the new one starts as this one did
+            command = self._controller.updates.prepare(install, self._port, flags)
         except updates.UpdateError as error:
             raise CommandError(error.code) from error
         try:
@@ -310,6 +337,15 @@ def offers_integration(settings: Settings) -> bool:
     return not settings.integration_answered or integration.start_menu_shortcut().is_file()
 
 
+def say(message: str) -> None:
+    """Says something to whoever ran this: the Windows build has no console to print on."""
+    print(message)
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        from nanar.desktop import win32
+
+        win32.message_box("Nanar", message)
+
+
 def remove_integration() -> None:
     """`--uninstall`: takes back what the offer on the TV page installed, and stops offering it.
     The rest is the unzipped folder and the data directory, which the user deletes."""
@@ -321,12 +357,7 @@ def remove_integration() -> None:
         integration.uninstall()
     settings.integration_answered = True
     settings.save(settings_path)
-    message = "Nanar n'est plus dans le menu Démarrer ni dans le clic droit sur les dossiers."
-    print(message)
-    if sys.platform == "win32" and getattr(sys, "frozen", False):
-        from nanar.desktop import win32
-
-        win32.message_box("Nanar", message)
+    say("Nanar n'est plus dans le menu Démarrer ni dans le clic droit sur les dossiers.")
 
 
 def check_parts() -> None:

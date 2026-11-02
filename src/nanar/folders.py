@@ -29,7 +29,11 @@ class Folders:
                 raise CommandError("not_a_folder")
         except OSError as error:  # a disk that is gone, a path Windows refuses
             raise CommandError("not_a_folder") from error
-        library = scan(path)
+        self._controller.set_scanning(True)
+        try:
+            library = scan(path)
+        finally:
+            self._controller.set_scanning(False)
         self._settings.last_folder = str(path)
         if self._settings_path is not None:
             self._settings.save(self._settings_path)

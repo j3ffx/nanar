@@ -70,7 +70,7 @@ class _Redirects(urllib.request.HTTPRedirectHandler):
         return new
 
 
-_opener = urllib.request.build_opener(_Redirects())
+https_opener = urllib.request.build_opener(_Redirects())
 
 
 def fetch(request: Request) -> bytes:
@@ -98,7 +98,7 @@ def _fetch_once(request: Request) -> bytes:
         method=method,
     )
     try:
-        with _opener.open(raw, timeout=TIMEOUT) as response:
+        with https_opener.open(raw, timeout=TIMEOUT) as response:
             data: bytes = response.read(MAX_ANSWER + 1)
         if len(data) > MAX_ANSWER:
             raise OnlineError("offline")
@@ -233,7 +233,13 @@ class OpenSubtitles:
         headers = self._headers() | {"Content-Type": "application/json"}
         body = json.dumps({"file_id": file_id}).encode()
         answer = json.loads(self._get(Request(f"{OPENSUBTITLES}/download", headers, body)))
-        link = answer.get("link")
+        link = str(answer.get("link") or "")
         if not link:
             raise OnlineError("quota_reached")
-        return self._get(Request(str(link), {}))
+        host = urllib.parse.urlsplit(link).hostname or ""
+        if not host.endswith((".opensubtitles.com", ".opensubtitles.org")):
+            raise OnlineError("offline")  # an answer doesn't choose where the PC connects
+        data = self._get(Request(link, {}))
+        if b"\0" in data:  # subtitles are text
+            raise OnlineError("offline")
+        return data

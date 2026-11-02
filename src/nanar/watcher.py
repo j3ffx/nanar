@@ -1,7 +1,8 @@
 """Watches the library's folder: a film that finishes downloading shows up by itself.
 
 Downloads in progress (`film.mkv.!qB`, `.part`…) are not videos to `library.scan`: the film joins
-the library when its file gets its real name. A burst of changes leads to one new reading.
+the library when its file gets its real name. A file growing is no news; a file arriving or leaving
+leads to a new reading, and the pages hear of it only if the videos did change, or a poster.
 """
 
 import logging
@@ -9,9 +10,10 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from watchfiles import watch
+from watchfiles import Change, watch
 
 from nanar.library import Library, scan
+from nanar.thumbnails import POSTER_EXTENSIONS
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +35,17 @@ class FolderWatcher:
     def _run(self) -> None:
         try:
             # watchfiles gathers the changes of about two seconds into one batch.
-            for _changes in watch(self._root, stop_event=self._stop, raise_interrupt=False):
-                self._on_change(scan(self._root))
+            known: set[str] | None = None
+            for changes in watch(self._root, stop_event=self._stop, raise_interrupt=False):
+                posters = any(Path(path).suffix.lower() in POSTER_EXTENSIONS for _, path in changes)
+                if not posters and all(kind == Change.modified for kind, _ in changes):
+                    continue
+                library = scan(self._root)
+                if self._stop.is_set():  # another folder was opened during that reading
+                    return
+                videos = {video.path for video in library.videos.values()}
+                if videos != known or posters:
+                    known = videos
+                    self._on_change(library)
         except Exception:  # a folder that vanished (a disk unplugged): stop watching, keep going
             log.exception("watching %s", self._root)
