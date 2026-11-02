@@ -494,3 +494,15 @@ def test_a_phone_leaving_is_noticed_at_once(app: FastAPI, phone: TestClient) -> 
     while controller.state()["phones"] and time.monotonic() < deadline:
         time.sleep(0.01)
     assert controller.state()["phones"] == 0
+
+
+def test_only_this_machine_opens_where_to_get_a_key(
+    client: TestClient, phone: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
+    pair(phone)
+    assert phone.post("/api/link", json={"target": "tmdb"}).status_code == 403
+    assert client.post("/api/link", json={"target": "https://evil.test"}).status_code == 422
+    assert client.post("/api/link", json={"target": "tmdb"}).status_code == 204
+    assert opened == ["https://www.themoviedb.org/settings/api"]

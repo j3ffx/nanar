@@ -92,9 +92,13 @@ export interface State {
   /** Stops at the end of this video, or in `remaining` seconds. */
   sleep: { kind: 'end' } | { kind: 'timer'; remaining: number } | null;
   /** Mode hôtel: the PC's own Wi-Fi, which phones join to reach Nanar. */
-  hotspot: { available: boolean; on: boolean; ssid: string | null };
+  hotspot: { available: boolean; on: boolean; ssid: string | null; code: string | null };
+  /** The last thing gone wrong on its own, to say once (a video that can't play). */
+  notice: { code: string; seq: number } | null;
   /** New versions of the Windows build, looked for on GitHub when the user said so. */
   updates: {
+    version: string;
+    checkedAt: number | null;
     supported: boolean;
     enabled: boolean;
     available: string | null;
@@ -191,6 +195,14 @@ export interface OnlineSettings {
   tmdb: { set: boolean; hint: string | null; error: string | null };
   opensubtitles: { set: boolean; hint: string | null };
 }
+
+/** This machine only: asks Windows how the hotspot is now; the live state brings the answer. */
+export async function fetchHotspot(): Promise<void> {
+  await fetch('/api/hotspot');
+}
+
+/** This machine only: opens a service's page in the PC's browser. */
+export const openLink = (target: 'tmdb' | 'opensubtitles') => send('/api/link', { target });
 
 /** This machine only: looks for new versions once a day (or stops). */
 export const setCheckUpdates = (enabled: boolean) => send('/api/updates', { enabled });
