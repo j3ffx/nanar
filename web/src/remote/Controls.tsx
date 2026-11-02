@@ -34,6 +34,11 @@ function sentence(error: unknown): string {
   return MESSAGES[error.code] ?? 'Ça n’a pas marché. Réessaie.';
 }
 
+const NOTICES: Record<string, string> = {
+  cannot_play: 'Impossible de lire cette vidéo : le fichier a peut-être été déplacé.',
+  quota_reached: 'Plus de sous-titres en ligne pour aujourd’hui (limite d’OpenSubtitles).',
+};
+
 export type Tab = 'remote' | 'library';
 
 interface Props {
@@ -48,6 +53,7 @@ interface Props {
 }
 
 export function Controls({ state, connected, hop, tab, onTab, onUnpaired, library }: Props) {
+  const [hopClosed, setHopClosed] = useState(false);
   const [toast, setToast] = useState<{ text: string } | null>(null);
   const notify = useCallback((text: string) => setToast({ text }), []);
   useEffect(() => {
@@ -70,6 +76,16 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
     [onUnpaired, notify],
   );
 
+  // What went wrong on its own (a video that can't play), once.
+  const noticed = useRef<number | null>(null);
+  const notice = state?.notice;
+  useEffect(() => {
+    if (!notice || noticed.current === notice.seq) return;
+    const first = noticed.current === null && !state?.playing;
+    noticed.current = notice.seq;
+    if (!first) notify(NOTICES[notice.code] ?? 'Quelque chose n’a pas marché.');
+  }, [notice, state?.playing, notify]);
+
   const playing = state?.playing ?? null;
 
   return (
@@ -78,14 +94,19 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
         <p className={styles.logoSmall}>
           Nanar<span className={styles.dot}>.</span>
         </p>
-        <span className={styles.link} data-on={connected || undefined}>
-          {connected ? 'Connecté' : 'Connexion…'}
-        </span>
+        {!connected && state && (
+          <span className={styles.link} role="status">
+            Nanar ne répond plus…
+          </span>
+        )}
         <button
           type="button"
           className={styles.iconButton}
+          data-end
           onClick={() => send('fullscreen')}
-          aria-label={state?.fullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+          aria-label={
+            state?.fullscreen ? 'Quitter le plein écran sur la télé' : 'Plein écran sur la télé'
+          }
           disabled={!state}
         >
           {state?.fullscreen ? <Icon.ExitFullscreen /> : <Icon.Fullscreen />}
@@ -93,10 +114,10 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
       </header>
 
       {state?.upNext && (
-        <aside className={styles.upNext} aria-live="polite">
+        <aside className={styles.upNext}>
           <p className={styles.upNextText}>
             <span>
-              À suivre dans <strong>{state.upNext.seconds} s</strong>
+              Suite dans <strong>{state.upNext.seconds} s</strong>
             </span>
             <span className={styles.upNextTitle}>
               {state.upNext.video.kind === 'episode'
@@ -106,10 +127,10 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
           </p>
           <div className={styles.row}>
             <Pill onClick={() => send('next')}>
-              <Icon.Next /> Maintenant
+              <Icon.Next /> Lancer
             </Pill>
-            <Pill onClick={() => send('stop')} tone="stop">
-              <Icon.Stop /> Arrêter
+            <Pill onClick={() => send('pause')}>
+              <Icon.Pause /> Rester ici
             </Pill>
           </div>
         </aside>
@@ -121,7 +142,7 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
         <NowPlaying playing={playing} state={state!} send={send} notify={notify} />
       ) : (
         <section className={styles.idle}>
-          <p className={styles.lead}>{state ? 'Rien à l’écran.' : 'Connexion à Nanar…'}</p>
+          <p className={styles.lead}>{state ? 'Aucune vidéo en cours.' : 'Connexion à Nanar…'}</p>
           <p className={styles.hint}>Choisis un film dans la bibliothèque, ou sur la télé.</p>
           <button type="button" className={styles.idleButton} onClick={() => onTab('library')}>
             Ouvrir la bibliothèque
@@ -129,18 +150,24 @@ export function Controls({ state, connected, hop, tab, onTab, onUnpaired, librar
         </section>
       )}
 
-      {hop?.state === 'unreachable' && (
+      {hop?.state === 'unreachable' && !hopClosed && (
         <aside className={styles.hop}>
           <p className={styles.note}>
-            Pour que la télécommande marche sur tous les Wi-Fi, ouvre-la sous son nom fixe, puis
-            ajoute-la à l’écran d’accueil.
-            {hop.why === 'timeout' && ' (nanar.local n’a pas répondu tout de suite.)'}
+            Sur ce téléphone, l’adresse nanar.local n’a pas répondu. L’icône marchera sur ce Wi-Fi ;
+            sur un autre, il faudra rescanner le code de la télé.
           </p>
-          <a className={styles.hopLink} href={hop.url}>
-            Ouvrir nanar.local
-          </a>
+          <div className={styles.row}>
+            <a className={styles.hopLink} href={hop.url}>
+              Essayer nanar.local
+            </a>
+            <button type="button" className={styles.hopClose} onClick={() => setHopClosed(true)}>
+              Fermer
+            </button>
+          </div>
         </aside>
       )}
+
+      {hop?.state !== 'trying' && !playing && tab === 'remote' && state && <HomeScreenTip />}
 
       {toast && (
         <p className={styles.toast} role="status">
@@ -200,11 +227,11 @@ function NowPlaying({
 
   return (
     <>
-      <section className={styles.now} aria-live="polite">
+      <section className={styles.now}>
         <p className={styles.kicker}>
           {video.kind === 'episode' ? episodeCode(video) : video.year ? String(video.year) : 'Film'}
         </p>
-        <h1 className={styles.title}>
+        <h1 className={styles.title} aria-live="polite">
           {video.kind === 'episode' ? (video.episodeTitle ?? video.title) : video.title}
         </h1>
         {video.kind === 'episode' && <p className={styles.series}>{video.title}</p>}
@@ -235,14 +262,14 @@ function NowPlaying({
       </section>
 
       <section className={styles.row} aria-label="Déplacements">
-        <Pill onClick={() => send('seek', -60)}>
+        <Pill onClick={() => send('seek', -60)} label="1 minute en arrière">
           <Icon.Jump seconds={-60} /> 1 min
+        </Pill>
+        <Pill onClick={() => send('seek', 60)} label="1 minute en avant">
+          1 min <Icon.Jump seconds={60} />
         </Pill>
         <Pill onClick={() => send('stop')} tone="stop">
           <Icon.Stop /> Arrêter
-        </Pill>
-        <Pill onClick={() => send('seek', 60)}>
-          1 min <Icon.Jump seconds={60} />
         </Pill>
       </section>
 
@@ -270,7 +297,7 @@ function NowPlaying({
         <Pill onClick={() => setSheet('subs')} wide>
           <Icon.Subtitles />
           <span className={styles.pillText}>
-            {selectedLabel(playing.subs) ?? 'Sans sous-titres'}
+            {selectedLabel(playing.subs) ?? 'Pas de sous-titres'}
           </span>
         </Pill>
       </section>
@@ -278,7 +305,7 @@ function NowPlaying({
       <section className={styles.row} aria-label="Soirée">
         <Pill onClick={() => send('night', !state.night)} pressed={state.night} wide>
           <Icon.Moon />
-          <span className={styles.pillText}>Mode nuit</span>
+          <span className={styles.pillText}>Son de nuit</span>
         </Pill>
         <Pill onClick={() => setSheet('sleep')} pressed={state.sleep !== null} wide>
           <Icon.Timer />
@@ -286,8 +313,21 @@ function NowPlaying({
         </Pill>
       </section>
 
-      <Sheet title="Arrêter la lecture" open={sheet === 'sleep'} onClose={() => setSheet(null)}>
+      <Sheet title="Arrêt automatique" open={sheet === 'sleep'} onClose={() => setSheet(null)}>
         <ul className={styles.tracks}>
+          {state.sleep?.kind === 'timer' && (
+            <li>
+              <button
+                type="button"
+                className={styles.track}
+                aria-pressed
+                onClick={() => setSheet(null)}
+              >
+                Arrêt dans {Math.max(1, Math.ceil(state.sleep.remaining / 60))} min
+                <Icon.Check />
+              </button>
+            </li>
+          )}
           {SLEEP_CHOICES(end).map(([value, label]) => {
             const chosen =
               value === null
@@ -349,7 +389,7 @@ function NowPlaying({
 const round = (n: number) => Math.round(n * 10) / 10;
 
 const SLEEP_CHOICES = (end: string): [string | number | null, string][] => [
-  [null, 'Jamais'],
+  [null, 'Pas d’arrêt'],
   ['end', end],
   [15, 'Dans 15 minutes'],
   [30, 'Dans 30 minutes'],
@@ -361,7 +401,7 @@ const SLEEP_CHOICES = (end: string): [string | number | null, string][] => [
 function sleepLabel(sleep: State['sleep'], end: string): string {
   if (sleep === null) return 'Minuterie';
   if (sleep.kind === 'end') return end;
-  return `${Math.max(1, Math.ceil(sleep.remaining / 60))} min`;
+  return `Arrêt : ${Math.max(1, Math.ceil(sleep.remaining / 60))} min`;
 }
 
 function selectedLabel(tracks: Track[]): string | null {
@@ -441,7 +481,7 @@ function Progress({
         step={1}
         value={Math.floor(shown)}
         disabled={!duration}
-        aria-label="Avancement"
+        aria-label="Position dans la vidéo"
         aria-valuetext={`${clock(shown)} sur ${duration ? clock(duration) : 'durée inconnue'}`}
         style={{ '--level': `${ratio * 100}%` } as CSSProperties}
         onChange={(event) => setTarget(Number(event.target.value))}
@@ -566,6 +606,45 @@ function Stepper(props: { label: string; value: string; onLess: () => void; onMo
   );
 }
 
+const TIP_CLOSED = 'nanar.tipClosed'; // localStorage: the home screen tip was dismissed
+
+/** Once: how to keep the remote one tap away. Not in the icon itself, nor once dismissed. */
+function HomeScreenTip() {
+  const [closed, setClosed] = useState(() => {
+    try {
+      return (
+        localStorage.getItem(TIP_CLOSED) !== null ||
+        matchMedia('(display-mode: standalone)').matches
+      );
+    } catch {
+      return true;
+    }
+  });
+  if (closed) return null;
+  const iphone = /iphone|ipad/i.test(navigator.userAgent);
+  const close = () => {
+    setClosed(true);
+    try {
+      localStorage.setItem(TIP_CLOSED, '1');
+    } catch {
+      // asked again next time, nothing else lost
+    }
+  };
+  return (
+    <aside className={styles.hop}>
+      <p className={styles.note}>
+        Pour retrouver la télécommande d’un geste :{' '}
+        {iphone
+          ? 'bouton Partager, puis « Sur l’écran d’accueil ».'
+          : 'menu ⋮ du navigateur, puis « Ajouter à l’écran d’accueil ».'}
+      </p>
+      <button type="button" className={styles.hopClose} onClick={close}>
+        Compris
+      </button>
+    </aside>
+  );
+}
+
 function Round(props: {
   label: string;
   onClick: () => void;
@@ -592,11 +671,13 @@ function Pill(props: {
   tone?: 'stop';
   wide?: boolean;
   pressed?: boolean;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       className={styles.pill}
+      aria-label={props.label}
       aria-pressed={props.pressed}
       data-tone={props.tone}
       data-wide={props.wide || undefined}

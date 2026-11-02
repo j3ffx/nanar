@@ -23,7 +23,7 @@ export function Remote() {
         <>
           <p className={styles.lead}>Nanar ne répond pas.</p>
           <p className={styles.hint}>
-            Vérifie qu’il est ouvert sur l’ordinateur, et que ton téléphone est sur le même Wi-Fi.
+            Vérifie qu’il est ouvert sur le PC, et que ton téléphone est sur le même Wi-Fi.
           </p>
         </>
       )}

@@ -34,7 +34,7 @@ export function Sheet({ title, open, onClose, children }: Props) {
         <div className={styles.sheetHeader}>
           <h2 className={styles.sheetTitle}>{title}</h2>
           <button type="button" className={styles.sheetClose} onClick={onClose}>
-            OK
+            Fermer
           </button>
         </div>
         {children}

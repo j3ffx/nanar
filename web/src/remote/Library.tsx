@@ -1,10 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 
 import { mark, play, setView, type Library as LibraryData, type Video } from '@/lib/api';
 import { filterEntries, isFiltered, NO_FILTER, type Filter } from '@/lib/filter';
 import { clock, countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
-import { continueLabel, groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
+import { continueLabel, groupNext, groupWatched, ratioOf, resumeLabel } from '@/lib/progress';
 
 import styles from './Library.module.css';
 import { Sheet } from './Sheet';
@@ -25,8 +25,13 @@ export function Library({ library, onStarted, onError }: Props) {
   const groupId = params?.id ?? null;
 
   // The TV page follows: same page, the film picked here put forward there, the same search
-  // (sent once typing pauses).
+  // (sent once typing pauses). Not just for opening this tab: that moves nothing on the phone.
+  const opened = useRef(false);
   useEffect(() => {
+    if (!opened.current) {
+      opened.current = true;
+      return;
+    }
     const timer = setTimeout(() => {
       setView(groupId ? `/g/${groupId}` : '/', picked?.id ?? null, filter).catch(() => {});
     }, 200);
@@ -46,10 +51,11 @@ export function Library({ library, onStarted, onError }: Props) {
     setPicked(null);
     play(video.id, from)
       .then(onStarted)
-      .catch(() => onError('Cette vidéo ne veut pas démarrer.'));
+      .catch(() => onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'));
   };
 
   const group = groupId ? library.groups[groupId] : undefined;
+  const next = group ? groupNext(library, group) : undefined;
   const filtered = isFiltered(filter);
   const entries = filtered ? filterEntries(library, filter) : library.entries;
   const kinds = [
@@ -69,6 +75,13 @@ export function Library({ library, onStarted, onError }: Props) {
             {group.title}
           </h1>
           <p className={styles.count}>{countLabel(group)}</p>
+          {group.overview && <p className={styles.overview}>{group.overview}</p>}
+          {next && resumeFrom(next, group.videos[0]) && (
+            <button type="button" className={styles.primary} onClick={() => setPicked(next)}>
+              <span aria-hidden="true">▶</span> Reprendre :{' '}
+              {next.kind === 'episode' ? episodeCode(next) : shortTitle(next)}
+            </button>
+          )}
           <ol className={styles.rows}>
             {group.videos.map((id, index) => {
               const video = library.videos[id]!;
@@ -96,7 +109,9 @@ export function Library({ library, onStarted, onError }: Props) {
         <section className={styles.page} aria-label="Bibliothèque">
           <h1 className={styles.heading}>Bibliothèque</h1>
           {library.entries.length === 0 && (
-            <p className={styles.loading}>Rien à l’affiche… pour l’instant.</p>
+            <p className={styles.loading}>
+              Aucune vidéo pour l’instant. Choisis ton dossier de films sur le PC.
+            </p>
           )}
           {library.entries.length > 0 && (
             <div className={styles.filters}>
@@ -241,6 +256,11 @@ export function Library({ library, onStarted, onError }: Props) {
   );
 }
 
+/** Worth a button: somewhere other than the very first video, or left in its middle. */
+function resumeFrom(next: Video, first: string | undefined): boolean {
+  return next.id !== first || !!resumeLabel(next);
+}
+
 function Picked({
   video,
   library,
@@ -274,7 +294,7 @@ function Picked({
       {resume ? (
         <>
           <button type="button" className={styles.primary} onClick={() => onStart(video)}>
-            ▶ {resume}
+            <span aria-hidden="true">▶</span> {resume}
           </button>
           <button type="button" className={styles.secondary} onClick={() => onStart(video, 0)}>
             Depuis le début
@@ -282,7 +302,7 @@ function Picked({
         </>
       ) : (
         <button type="button" className={styles.primary} onClick={() => onStart(video, 0)}>
-          ▶ Lecture
+          <span aria-hidden="true">▶</span> Lecture
         </button>
       )}
       {group && group.videos.length > 1 && (
