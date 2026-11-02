@@ -83,7 +83,7 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   file's age. The phone's
   progress bar shows frames of the video playing (`previews.py`), grabbed when asked.
 - **The TV follows the phone** (`set_view`): the page, the item and the search a phone looks
-  at; not the other way round.
+  at; not the other way round, and not away from this machine's own pages (`/hotel`, `/reglages`).
 - **mpv's callbacks never wait.** They come from mpv's event thread, and closing mpv waits for that
   thread: whatever they report runs on the controller's worker thread (`controller.py`).
 - **Languages:** French audio first, then English; French subtitles, left off when the audio is
@@ -91,24 +91,32 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   lasts until Nanar closes, never across runs.
 - **Local and private.** No telemetry, no account, no request to the Internet by default: the
   library is read from file names only. Two services are opt-in, each with the user's own key set
-  on the TV page (`/api/online`, this machine only, the keys never sent back to a page): TMDb
+  on the TV page (`/api/online`, this machine only, the keys never sent back to a page, their last four characters aside): TMDb
   (title and year → poster, summary) and OpenSubtitles (title, year, episode, the video's hash →
   French subtitles, kept in the data directory, never next to the films). `online.py` says what
   is sent; nothing else ever is. A third box, off by default, has the Windows build ask GitHub's
   API for the latest release once a day (`updates.py`); a yes on the TV page downloads it,
-  checks its SHA-256, and a PowerShell script swaps the folders once Nanar has closed. The server listens on the local network for the phones; who may call what
-  is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
+  checks its SHA-256, and a PowerShell script swaps the folders once Nanar has closed, bringing
+  the old one back if the new one doesn't answer (tests run the real script). Paths from a request
+  never reach the file system. The server listens on the local network for the phones; who may
+  call what is in `security.py`: this machine (loopback address _and_ loopback `Host`, against DNS
   rebinding), or a phone carrying the pairing key (`nanar_key` cookie, `HttpOnly`,
   `SameSite=Strict`, or a Bearer header). Anything that changes state needs a JSON body; no CORS
-  header is ever granted; a WebSocket must come from the page's own origin.
+  header is ever granted (`/api/health` aside); a WebSocket must come from the page's exact
+  origin, and no page shows in another site's frame.
 - **Pairing:** one key per installation (`pairing.py`), shown on the TV as a QR code whose URL
   carries it in the fragment (never sent to a server or logged). Whoever sees the TV may pair: that
   is the point. `--new-key` unpairs every phone, `--local` listens on loopback only. A paired
   phone's manifest start URL carries the key, so that an iPhone home screen icon (cookies of its
-  own) is paired too.
+  own) is paired too. A paired phone also keeps the key in `localStorage`, with the PC's other
+  addresses: each address has its own cookie, and falling back to one must not unpair it.
+- **The live connection tells the truth.** Player commands go over the WebSocket, already open:
+  each new connection would need `nanar.local` to resolve again. The server sends a tick every ten
+  seconds and the page reconnects after 25 s of silence, as a Wi-Fi that drops closes nothing on
+  the phone's side. "Nanar ne répond pas" means silence, never a refusal.
 - **One name on every network:** `discovery.py` announces `nanar.local` (mDNS) with the
   addresses of the real adapters (`pairing.lan_addresses` leaves out WSL, Hyper-V, VPN tunnels,
-  Bluetooth). The QR code holds the IP address, which always works; the page then moves to
+  Bluetooth, and the hotspot's adapter while it is closed, which keeps its address). The QR code holds the IP address, which always works; the page then moves to
   `nanar.local` when its request there succeeds, or offers a link to it (a browser may refuse a
   page's request to a `.local` name yet open it as a link), so that the cookie and the home screen icon belong to a
   name that outlives a change of Wi-Fi. `GET /api/health` is the one CORS-readable route, for that
@@ -120,7 +128,7 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   page, to add a Start menu entry and "Ouvrir avec Nanar" on folders (`desktop/integration.py`:
   the user's own HKCU and Start menu folder only); nothing is written before a yes. Folders are
   opened, and those menus answered, from this machine only (`/api/open`, `/api/integration`).
-- **Mode hôtel** (`hotspot.py`): asked on the TV page only, Nanar turns on Windows' mobile
+- **Mode hôtel** (`hotspot.py`, the TV page's "Téléphone" button): asked on the TV page only, Nanar turns on Windows' mobile
   hotspot (WinRT through PowerShell, no dependency), shows its name and password as a Wi-Fi QR
   code (this machine's page only, never in the live state or a log), points the remote's QR code
   at the hotspot's address, and turns it off on exit if it turned it on.

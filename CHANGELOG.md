@@ -4,6 +4,43 @@ Les changements de chaque version de Nanar, la plus récente en premier. Les num
 [versionnage sémantique](https://semver.org/lang/fr/) : tant qu’ils commencent par 0, l’application
 évolue encore beaucoup.
 
+## 0.5.1 — à venir
+
+**Si tu es en 0.5.0 :** sa mise à jour en un clic ne marche pas (elle ferme Nanar et s’arrête là).
+Remplace le dossier à la main une dernière fois.
+
+### Corrections
+
+- **« Nanar ne répond pas » en pleine lecture** : les commandes passent maintenant par la connexion
+  déjà ouverte, et `nanar.local` n’annonce plus une adresse que le téléphone ne peut pas joindre.
+- **La télécommande ne se retrouve plus « pas encore associée »** quand elle repasse de
+  `nanar.local` à l’adresse du PC : elle s’y associe toute seule, et revient au nom dès qu’il répond.
+- « Connecté » ne s’affiche plus sur un Nanar disparu : la télécommande remarque le silence et
+  repart d’elle-même.
+- **La mise à jour en un clic marche**, et l’ancienne version revient si la nouvelle ne répond pas.
+- Sécurité : une adresse piégée pouvait faire se connecter le PC à une autre machine, sans clé ; un
+  programme posé dans un dossier de films pouvait être lancé à la place de PowerShell. Les deux
+  sont corrigés.
+- En passant à l’épisode suivant, la position de l’ancien ne peut plus être enregistrée sur le
+  nouveau, et le son coupé ou le décalage des sous-titres restent justes sur le téléphone.
+- Reculer pendant le compte à rebours reste sur la vidéo ; « Chapitre suivant » sur le dernier ne
+  revient plus au début.
+- Une vidéo illisible le dit, sur la télé et le téléphone. La télé ne s’assombrit plus pendant qu’on
+  la pilote du téléphone, et une grande bibliothèque ne fige plus la télécommande.
+- Le mode hôtel suit l’état réel du Wi-Fi, que Windows peut fermer tout seul.
+
+### Nouveautés
+
+- **Une page pour obtenir chaque clé** (TMDB, OpenSubtitles) : les étapes, un bouton pour ouvrir la
+  page, de quoi copier les réponses du formulaire. La clé ne s’affiche plus en grand une fois
+  enregistrée.
+- **« Téléphone » et « Réglages » en haut de la télé**, plus au bout de la bibliothèque. « Téléphone »
+  dit quoi vérifier quand rien ne s’ouvre, et mène au mode hôtel.
+- Une série s’ouvre sur l’épisode où tu en es, avec « Reprendre » sur le téléphone. Le téléphone
+  explique comment se mettre sur l’écran d’accueil.
+- « Mode nuit » devient « Son de nuit », et d’autres textes plus clairs. Le bandeau de la télé et les
+  indications restent visibles, et les textes sont plus grands.
+
 ## 0.5.0 — 2026-10-30
 
 ### Nouveautés

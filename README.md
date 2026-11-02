@@ -7,14 +7,8 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> **Version 0.5.** Nanar range ta bibliothèque, l’affiche sur la télé et sur ton téléphone,
-> lit tes vidéos, reprend où tu t’étais arrêté et enchaîne les épisodes ; « À suivre », la
-> recherche et les aperçus de la barre de progression t’aident à choisir sans te lever ; le mode
-> nuit, la minuterie et les pistes retenues d’un épisode à l’autre accompagnent la soirée ; le
-> mode hôtel ouvre un Wi-Fi quand celui de l’hôtel isole le téléphone, et Nanar se met à jour
-> en un clic. Pour
-> Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte : le
-> [journal des changements](CHANGELOG.md).
+> Pour Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte :
+> [les nouveautés](CHANGELOG.md).
 
 ![L’accueil sur la télé, en mode démo : « À suivre », puis « Récemment ajoutés »](docs/capture-tele.png)
 
@@ -47,7 +41,7 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
   un film (la télé suit ce que tu regardes, pour que tout le monde voie), puis lecture, pause,
   ±10 s, ±1 min, épisode suivant, chapitres, volume, pistes audio et sous-titres, plein écran. La
   télé affiche ce que tu fais. Plusieurs téléphones peuvent piloter en même temps.
-- **Pour la soirée.** Le mode nuit adoucit les explosions et remonte les dialogues, pour ne pas
+- **Pour la soirée.** Le son de nuit adoucit les explosions et remonte les dialogues, pour ne pas
   réveiller les voisins. La minuterie arrête la lecture à la fin de l’épisode, ou dans 15 min à
   1 h 30. Si tu choisis la VO et les sous-titres pour un épisode, la suite de la série les garde.
 - **Trouver vite.** Cherche un titre depuis le téléphone (les accents ne comptent pas), ou ne
@@ -55,10 +49,10 @@ mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
   glissant la barre de progression, tu vois l’image du film à cet endroit.
 - **Tout se lit.** Le moteur de [mpv](https://mpv.io/) : tous les formats courants, les pistes
   audio et les sous-titres, le HDR. Nanar choisit la VF, sinon la VO avec les sous-titres français.
-- **Rien ne sort de ton PC.** Pas de compte, pas de pub, pas de statistiques : tout vient de tes
-  fichiers. Si tu veux des affiches, des résumés et des sous-titres en ligne, tu donnes à Nanar ta
-  propre clé TMDb ou OpenSubtitles dans ses réglages (voir plus bas) ; sans clé, il ne demande
-  rien à personne.
+- **Rien ne sort de ton PC, sauf si tu le demandes.** Pas de compte, pas de pub, pas de
+  statistiques : par défaut, tout vient de tes fichiers. Trois options, désactivées au départ,
+  font sortir Nanar sur Internet : des affiches et des résumés (TMDB), des sous-titres en ligne
+  (OpenSubtitles), la recherche de mises à jour (GitHub). Voir plus bas ce que chacune envoie.
 
 ## Installer
 
@@ -68,20 +62,22 @@ Sur **Windows 10 ou 11** :
    [la dernière version](https://github.com/j3ffx/nanar/releases/latest) (dans « Assets »).
 2. Décompresse-le où tu veux (Documents, un autre disque…), ouvre le dossier `Nanar` et lance
    **`Nanar.exe`**. Rien d’autre à installer.
-3. Nanar n’est pas encore signé ([Code signing policy](#code-signing-policy)) : Windows peut
-   afficher « Windows a protégé votre ordinateur » ou « Éditeur inconnu ». Clique sur
+3. Windows ne connaît pas encore l’auteur de Nanar
+   ([pourquoi](#code-signing-policy)) : il peut afficher « Windows a protégé votre ordinateur » ou « Éditeur inconnu ». Clique sur
    « Informations complémentaires », puis « Exécuter quand même » (ou « Exécuter »).
-4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : accepte pour les
-   **réseaux privés**, sinon le téléphone ne trouvera pas le PC.
+4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : coche **les réseaux
+   privés et publics** (un Wi-Fi d’hôtel est « public » pour Windows), sinon le téléphone ne
+   trouvera pas le PC.
 5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
    clic droit sur les dossiers (« Ouvrir avec Nanar ») : c’est toi qui décides.
 
-Le fichier `.sha256` à côté du zip permet de vérifier qu’il n’a pas été altéré. Tes réglages, ta
-progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier de Nanar :
-pour une nouvelle version, remplace simplement le dossier. Plus simple : dans **Réglages**, sur la
-télé, coche « Chercher les nouvelles versions ». Nanar demande alors à GitHub, une fois par jour,
-s’il y a du nouveau, et propose de s’installer en un clic : il télécharge le zip, vérifie son
-SHA-256, remplace son dossier et redémarre.
+Le fichier `.sha256` à côté du zip permet de vérifier que le téléchargement n’est pas abîmé. Tes
+réglages, ta progression et les images sont rangés dans `%LOCALAPPDATA%\nanar`, pas dans le dossier
+de Nanar : pour une nouvelle version, remplace simplement le dossier. Plus simple : dans
+**Réglages**, sur la télé, coche « Chercher les nouvelles versions ». Nanar demande alors à GitHub,
+au démarrage puis une fois par jour, s’il y a du nouveau, et propose de s’installer en un clic : il
+télécharge le zip, vérifie son SHA-256, remplace son dossier et redémarre ; si la nouvelle version
+ne répond pas, l’ancienne revient.
 
 **Désinstaller :** si tu as accepté le menu Démarrer et le clic droit, retire-les d’abord : dans
 le dossier `Nanar`, clic droit dans le vide → « Ouvrir dans le Terminal », puis
@@ -106,46 +102,53 @@ mires générées à la volée.
 ## La télécommande
 
 1. Lance Nanar : la télé affiche un QR code en bas à droite.
-2. Scanne-le avec l’appareil photo du téléphone, branché au même Wi-Fi que le PC. La page de la
-   télécommande s’ouvre ; ajoute-la à l’écran d’accueil pour la retrouver d’un geste.
+2. Scanne-le avec l’appareil photo du téléphone, connecté au même Wi-Fi que le PC. La page de la
+   télécommande s’ouvre.
+3. Ajoute-la à l’écran d’accueil pour la retrouver d’un geste : sur iPhone, bouton Partager puis
+   « Sur l’écran d’accueil » ; sur Android, menu ⋮ puis « Ajouter à l’écran d’accueil ».
 
-Nanar s’annonce sur le réseau sous le nom **`nanar.local`** : quand ton téléphone sait trouver ce
-nom (les iPhone toujours, Android selon sa version), la télécommande passe à l’adresse
-`http://nanar.local:8642`, qui ne change pas d’un Wi-Fi à l’autre (si elle n’y passe pas toute
-seule, elle propose un bouton « Ouvrir nanar.local »). Ajoute-la à l’écran d’accueil depuis cette
-adresse : l’icône marchera alors partout, sans rescanner. Sinon, elle garde l’adresse du réseau
-où tu l’as ajoutée, et il faut rescanner le QR code sur un autre Wi-Fi.
+Rien ne s’ouvre ? Bouton **Téléphone**, en haut de la télé : ce qu’il faut vérifier, et le mode
+hôtel.
 
-Nanar ne parle qu’au réseau local, jamais à Internet. Seul un téléphone qui a scanné le code de ta
-télé peut le piloter ; `nanar --new-key` change le code (les téléphones déjà appairés devront le
-rescanner), et `nanar --local` coupe la télécommande.
+Le code de la télé contient l’adresse du PC, qui change d’un Wi-Fi à l’autre. Nanar s’annonce aussi
+sous le nom **`nanar.local`** : quand ton téléphone sait trouver ce nom (les iPhone toujours, Android
+selon sa version), la télécommande passe à `http://nanar.local:8642`, et l’icône ajoutée depuis
+cette adresse marche sur tous les Wi-Fi. Si le nom se tait un moment, elle repasse d’elle-même par
+l’adresse du PC, puis revient. Sans ce nom, il faut rescanner le code sur un autre Wi-Fi.
+
+La télécommande ne passe que par le réseau local. Seul un téléphone qui a scanné le code de ta télé
+peut la piloter. Depuis le dossier de Nanar, Nanar fermé, `.\Nanar.exe --new-key` change le code
+(les téléphones associés devront le rescanner), et `.\Nanar.exe --local` coupe la télécommande.
 
 **À l’hôtel ou chez des amis**, le Wi-Fi isole souvent les appareils les uns des autres : le
-téléphone ne voit pas le PC. Sur la télé, choisis **Mode hôtel** (en bas de la bibliothèque) :
-Nanar ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et affiche deux
-QR codes, l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme en partant.
+téléphone ne voit pas le PC. Sur la télé, bouton **Téléphone**, puis **Ouvrir un Wi-Fi Nanar** : Nanar
+ouvre le point d’accès sans fil de Windows, qui partage la connexion du PC, et affiche deux QR codes,
+l’un pour rejoindre ce Wi-Fi, l’autre pour la télécommande. Il le referme quand tu fermes Nanar.
 Autre solution : active le partage de connexion de ton téléphone et connecte le PC dessus ; le QR
-code de la télé suit le changement de réseau en quelques secondes. Les échanges ne
-sont pas chiffrés : sur un Wi-Fi public partagé, quelqu’un sur le même réseau pourrait voir ce que tu
-regardes.
+code de la télé suit le changement de réseau en une trentaine de secondes.
+
+Les échanges ne sont pas chiffrés : sur un Wi-Fi public, quelqu’un de mal intentionné sur le même
+réseau pourrait voir ce que tu regardes, et même récupérer le code pour piloter Nanar. Le Wi-Fi Nanar
+ou le partage de connexion évitent ça.
 
 ## Affiches et sous-titres en ligne (en option)
 
 Sans rien faire, Nanar ne demande rien à Internet. Pour avoir les affiches et les résumés des films
-et des séries, ou des sous-titres français quand une vidéo n’en a pas, ouvre **Réglages** en bas
-de la bibliothèque, sur la télé, et colle ta clé :
+et des séries, ou des sous-titres français quand une vidéo n’en a pas, ouvre **Réglages**, en haut
+de la télé : une page explique pas à pas comment obtenir chaque clé, gratuite.
 
-- **TMDb**, pour les affiches et les résumés : une clé d’API gratuite, sur
-  [themoviedb.org](https://www.themoviedb.org/settings/api) (un compte, puis Paramètres › API).
-  Nanar envoie le titre et l’année lus dans le nom de chaque fichier.
-- **OpenSubtitles**, pour les sous-titres : une clé gratuite, sur
-  [opensubtitles.com](https://www.opensubtitles.com/consumers) (« API consumers »), qui donne
-  cinq sous-titres par jour. Le bouton apparaît alors dans les sous-titres de la télécommande.
-  Nanar envoie le titre, l’année, l’épisode et l’empreinte de la vidéo (pour trouver des
-  sous-titres calés sur ta version) ; ils sont gardés dans le dossier de données de Nanar, pas à
-  côté de tes films, et reviennent tout seuls pour les épisodes suivants.
+- **TMDB**, pour les affiches et les résumés. En arrière-plan, Nanar envoie le titre et l’année lus
+  dans le nom de **chaque vidéo du dossier**, vidéos personnelles comprises. À toi de voir si ça te
+  va.
+- **OpenSubtitles**, pour les sous-titres. Le bouton apparaît dans les sous-titres de la
+  télécommande. Nanar envoie le titre, l’année, l’épisode et l’empreinte de la vidéo (un calcul sur
+  le fichier, qui permet de trouver des sous-titres calés sur ta version, sans dévoiler son
+  contenu). Une fois choisis pour une série, ils sont cherchés tout seuls pour les épisodes suivants,
+  dans la limite de cinq par jour. Ils sont gardés dans le dossier de données de Nanar, pas à côté
+  de tes films.
 
-Rien d’autre ne part : ni la liste de tes films, ni ton adresse. Retirer la clé arrête tout.
+Comme tout site, ces services voient l’adresse Internet de ta connexion. Rien d’autre ne part, et
+retirer la clé arrête tout.
 
 ## Les touches
 
@@ -195,9 +198,10 @@ gardent leur propre signature, ou n’en ont pas.
   [j3ffx](https://github.com/j3ffx).
 
 **Confidentialité :** _This program will not transfer any information to other networked systems
-unless specifically requested by the user or the person installing or operating it._ Nanar ne
-parle qu’aux téléphones que tu as appairés sur ton réseau local, jamais à Internet : pas de
-compte, pas de statistiques, pas de jaquettes téléchargées. Les bibliothèques qu’il embarque
+unless specifically requested by the user or the person installing or operating it._ Par défaut,
+Nanar ne parle qu’aux téléphones que tu as associés sur ton réseau local : pas de compte, pas de
+statistiques. Trois options, désactivées au départ, le font sortir sur Internet : TMDB,
+OpenSubtitles et la recherche de mises à jour sur GitHub. Les bibliothèques qu’il embarque
 (mpv, guessit, pywebview, zeroconf…) n’envoient rien non plus ; `nanar.local` est annoncé sur le
 réseau local seulement.
 
