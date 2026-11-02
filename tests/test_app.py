@@ -500,7 +500,12 @@ def test_only_this_machine_opens_where_to_get_a_key(
     client: TestClient, phone: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     opened: list[str] = []
-    monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
+
+    def browser(url: str) -> bool:
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr("webbrowser.open", browser)
     pair(phone)
     assert phone.post("/api/link", json={"target": "tmdb"}).status_code == 403
     assert client.post("/api/link", json={"target": "https://evil.test"}).status_code == 422
