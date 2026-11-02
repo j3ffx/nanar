@@ -47,9 +47,9 @@ class FakeSession:
         """The video reached its end (mpv stays open on its last picture)."""
         self.callbacks.finished()
 
-    def fail(self) -> None:
+    def fail(self, *, window_closed: bool = False) -> None:
         """The video could not play, or mpv's window was closed."""
-        self.callbacks.ended(False, self.window)
+        self.callbacks.ended(not window_closed, self.window)
 
 
 class FakeSessions:

@@ -477,3 +477,91 @@ def test_mpv_refusing_a_command_while_a_file_opens_is_no_silence(
     sessions.last.command = refuse  # type: ignore[method-assign]
     with pytest.raises(CommandError, match="not_ready"):
         controller.command("seek", 10)
+
+
+def test_going_back_during_the_countdown_stays_on_this_video(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 0.5)
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: controller.state()["upNext"])
+    controller.command("seek", -30)
+    assert controller.state()["upNext"] is None
+    assert sessions.last.commands == [("seek", -30)]
+    assert not sessions.last.loaded
+
+
+def test_sleep_asked_during_the_countdown_stops_there(
+    controller: Controller,
+    library: Library,
+    sessions: FakeSessions,
+    window: FakeWindow,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(controller_module, "TICK", 0.05)
+    controller.play(video_id(library, "Saga"))
+    sessions.last.finish()
+    wait_for(lambda: controller.state()["upNext"])
+    controller.command("sleep", "end")
+    wait_for(lambda: window.visible)
+    assert not sessions.last.loaded
+
+
+def test_a_video_that_cannot_play_is_said_a_closed_window_is_not(
+    controller: Controller, library: Library, sessions: FakeSessions, window: FakeWindow
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    sessions.last.fail(window_closed=True)
+    wait_for(lambda: window.visible)
+    assert controller.state()["notice"] is None
+    controller.play(video_id(library, "Seul"))
+    sessions.last.fail()
+    wait_for(lambda: controller.state()["notice"])
+    assert controller.state()["notice"]["code"] == "cannot_play"
+
+
+def test_opening_another_folder_during_a_film_keeps_its_progress_in_its_own(
+    controller: Controller, library: Library, sessions: FakeSessions, progress: Progress
+) -> None:
+    controller.play(video_id(library, "Seul"))
+    sessions.last.report(position=600.0, duration=6000.0)
+    wait_for(lambda: progress.get("/films", "Seul 2001.mkv"))
+    controller.set_library(build("/autres", ["Autre 1999.mkv"]))
+    sessions.last.report(position=700.0, duration=6000.0)
+    wait_for(lambda: controller.state()["playing"]["position"] == 700.0)
+    controller.command("stop")
+    entry = progress.get("/films", "Seul 2001.mkv")
+    assert entry is not None
+    assert entry.position == 700.0
+    assert progress.get("/autres", "Seul 2001.mkv") is None
+
+
+def test_settings_of_the_film_carry_on_to_the_next_episode(
+    controller: Controller, library: Library, sessions: FakeSessions
+) -> None:
+    controller.play(video_id(library, "Saga"))
+    sessions.last.report(muted=True, sub_delay=1.5, sub_scale=1.5, position=5.0)
+    wait_for(lambda: controller.state()["playing"]["muted"])
+    controller.command("next")
+    playing = controller.state()["playing"]
+    assert playing["muted"]
+    assert playing["subDelay"] == 1.5
+    assert playing["subScale"] == 1.5
+
+
+def test_subtitles_already_there_are_shown_not_downloaded_twice(
+    controller: Controller, library: Library, sessions: FakeSessions, tmp_path: Path
+) -> None:
+    subtitles = FakeSubtitles(tmp_path)
+    controller.subtitles = subtitles  # type: ignore[assignment]
+    controller.play(video_id(library, "Seul"))
+    online = Track(7, "sub", "fr", "OpenSubtitles", False)
+    sessions.last.report(position=5.0, subs=[online])
+    wait_for(lambda: controller.state()["playing"]["subs"])
+    controller.find_subtitles()
+    assert sessions.last.commands == [("sub", 7)]
+    assert not subtitles.found

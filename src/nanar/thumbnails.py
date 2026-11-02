@@ -82,7 +82,9 @@ class Thumbnails:
             if local_poster(library, v) is None and not self._made(library, v).is_file()
         ]
         with self._lock:
-            self._pending = [m for m in missing if m[1] not in self._failed]
+            # A new reading of the folder: a file still downloading last time may be whole now.
+            self._failed.clear()
+            self._pending = missing
         self._wake.set()
         if self._thread is None:
             self._thread = threading.Thread(target=self._work, name="nanar-thumbs", daemon=True)

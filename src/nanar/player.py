@@ -127,9 +127,9 @@ class Callbacks(Protocol):
         """The video played to its end. mpv's window stays open on the last picture, for the
         next video or until the controller closes the session."""
 
-    def ended(self, finished: bool, rect: Rect | None) -> None:
-        """The video failed, or mpv's window was closed. Called once; the controller then
-        closes the session."""
+    def ended(self, failed: bool, rect: Rect | None) -> None:
+        """The video could not play (`failed`), or mpv's window was closed. Called once; the
+        controller then closes the session."""
 
 
 class Session(Protocol):
@@ -240,6 +240,7 @@ class MpvSession:
         self._at_end = False  # `finished` was called for the current video
         self._terminated = False
         self._picked = False  # the start's picks were applied to this video's tracks
+        self._loading = False  # another video was asked for, and hasn't started yet
         self._last_rect: Rect | None = start.rect
         options: dict[str, Any] = {
             "title": f"{start.title} — Nanar",
@@ -299,9 +300,14 @@ class MpvSession:
         self._start = start
         self._at_end = False
         self._picked = False
+        self._loading = True
+        # mpv keeps these from one file to the next, and says nothing as they don't change.
         self._playback = Playback(
             fullscreen=self._playback.fullscreen,
             volume=self._playback.volume,
+            muted=self._playback.muted,
+            sub_delay=self._playback.sub_delay,
+            sub_scale=self._playback.sub_scale,
             night=self._playback.night,
         )
         self._mpv["title"] = f"{start.title} — Nanar"
@@ -357,9 +363,12 @@ class MpvSession:
                 if count == 0:
                     return
                 current = int(m.chapter or 0)
-                target = max(0, min(count - 1, current + int(value)))
-                m.chapter = target
-                message = f"Chapitre {target + 1} / {count}"
+                target = max(0, current + int(value))
+                if target >= count:  # setting it again would go back to its start
+                    message = "Dernier chapitre"
+                else:
+                    m.chapter = target
+                    message = f"Chapitre {target + 1} / {count}"
             case _:
                 raise ValueError(f"unknown player action {action!r}")
         if osd and message:
@@ -420,7 +429,8 @@ class MpvSession:
         p = self._playback
         match name:
             case "time-pos":
-                if value is None:
+                # While another video opens, mpv still reports where the last one was.
+                if value is None or self._loading:
                     return
                 if not self._placed:
                     self._place()
@@ -462,6 +472,8 @@ class MpvSession:
             case "eof-reached":
                 if value:
                     self._reached_end()
+                else:  # moved back from the end: reaching it again is a new end
+                    self._at_end = False
                 return
         self._callbacks.changed(p)
 
@@ -482,7 +494,7 @@ class MpvSession:
             self._mpv["sid"] = sub
 
     def _reached_end(self) -> None:
-        if self._at_end or self._ended or self._terminated:
+        if self._at_end or self._ended or self._terminated or self._loading:
             return
         self._at_end = True
         self._callbacks.finished()
@@ -491,7 +503,9 @@ class MpvSession:
         if self._ended or self._terminated:
             return
         kind = event.event_id.value
-        if kind == self._ids.END_FILE:
+        if kind == self._ids.PLAYBACK_RESTART:
+            self._loading = False
+        elif kind == self._ids.END_FILE:
             reason = event.data.reason
             if reason == self._end_file.EOF:
                 # keep-open holds most videos on their last picture; streams end this way.
@@ -499,7 +513,7 @@ class MpvSession:
             elif reason == self._end_file.ERROR:
                 # The video could not play: the controller closes mpv.
                 self._ended = True
-                self._callbacks.ended(False, self.rect())
+                self._callbacks.ended(True, self.rect())
         elif kind == self._ids.SHUTDOWN:
             # mpv's window was closed (its close button, Alt+F4).
             self._ended = True

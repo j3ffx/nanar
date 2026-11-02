@@ -1,8 +1,9 @@
 """Where each video was left, and which ones were watched (SQLite, in the user's data directory).
 
-Videos are known by their library folder and their path inside it: a rescan, or the same disk
-mounted on another letter with the folder opened again, keeps their history. The audio and the
-subtitles picked are kept the same way, for a whole saga or series (or a film on its own).
+Videos are known by their library folder and their path inside it: a new reading of the folder
+keeps their history (the same disk under another letter is another folder, with a history of its
+own). The audio and the subtitles picked are kept the same way, for a whole saga or series (or a
+film on its own).
 """
 
 import sqlite3

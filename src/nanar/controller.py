@@ -123,6 +123,9 @@ class Controller:
         self._listeners: list[Listener] = []
         self._session: Session | None = None
         self._video: Video | None = None
+        self._video_root = ""  # the library it was played from: the folder may change under it
+        self._notice: dict[str, Any] | None = None  # the last thing gone wrong on its own
+        self._notices = 0
         self._playback: Playback | None = None
         self._saved_at = 0.0  # the position last saved for the current video
         self._generation = 0  # tells a finished session's late callbacks from the current one's
@@ -138,7 +141,12 @@ class Controller:
         self._sleep_at = 0.0  # when the timer stops the video (time.monotonic)
         self._sleep_timer: threading.Timer | None = None
         self._sleep_seq = 0  # tells a cancelled timer's late call from the current one
-        self._hotspot: dict[str, Any] = {"available": False, "on": False, "ssid": None}
+        self._hotspot: dict[str, Any] = {
+            "available": False,
+            "on": False,
+            "ssid": None,
+            "code": None,
+        }
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -197,6 +205,7 @@ class Controller:
                 "libraryVersion": self._library_version,
                 "playing": playing,
                 "upNext": up_next,
+                "notice": dict(self._notice) if self._notice else None,
                 "night": self._night,
                 "sleep": sleep,
                 "hotspot": dict(self._hotspot),
@@ -342,6 +351,7 @@ class Controller:
                 entry = self.progress.get(self.library.root, video.path)
                 start = entry.resume_at() if entry else 0.0
             self._video = video
+            self._video_root = self.library.root
             self._saved_at = start
             picks = self.progress.picks(self.library.root, _owner(video))
             begin = Start(
@@ -369,8 +379,15 @@ class Controller:
                 and self.subtitles.enabled
             )
             if self._session is not None:
-                # The same window: no flicker between two episodes.
-                self._playback = Playback(fullscreen=self.settings.fullscreen)
+                # The same window: no flicker between two episodes. mpv keeps these settings.
+                was = self._playback or Playback()
+                self._playback = Playback(
+                    fullscreen=self.settings.fullscreen,
+                    volume=was.volume,
+                    muted=was.muted,
+                    sub_delay=was.sub_delay,
+                    sub_scale=was.sub_scale,
+                )
                 self._session.load(begin)
             else:
                 rect = self.window.rect()
@@ -394,8 +411,19 @@ class Controller:
         with self._lock:
             if self._video is None or self.subtitles is None:
                 raise CommandError("nothing_playing" if self._video is None else "online_off")
-            video, root = self._video, self.library.root
+            video, root = self._video, self._video_root
             source = None if "://" in video.path else Path(self._source_of(video))
+            online = next(
+                (
+                    t.id
+                    for t in (self._playback.subs if self._playback else [])
+                    if t.title == ONLINE_TITLE
+                ),
+                None,
+            )
+            if online is not None and self._session is not None:  # already there: no second copy
+                self.command("sub", online, osd=True)
+                return
         try:
             found = self.subtitles.find(root, video, source)  # out of the lock: seconds
         except OnlineError as error:
@@ -410,8 +438,25 @@ class Controller:
         with self._lock:
             if self._video is None or self._video.id != video_id:
                 return
-        with contextlib.suppress(CommandError):
+        try:
             self.find_subtitles()
+        except CommandError as error:
+            if error.code != "quota_reached":
+                return
+            with self._lock:
+                if self._session is not None:
+                    with contextlib.suppress(Exception):
+                        self._session.message(
+                            "Plus de sous-titres en ligne pour aujourd’hui (OpenSubtitles).", 5
+                        )
+            self._tell("quota_reached")
+
+    def _tell(self, code: str) -> None:
+        """Something the pages should say although nobody asked (`notice` in the state)."""
+        with self._lock:
+            self._notices += 1
+            self._notice = {"code": code, "seq": self._notices}
+        self._announce()
 
     def set_check_updates(self, enabled: bool) -> None:
         """Looks for new versions on GitHub (once a day), or stops."""
@@ -471,6 +516,9 @@ class Controller:
                     self._cancel_up_next()  # "pause" during the countdown: stay here
                     self._announce_later()
                     return
+                if self._up_next is not None and action in ("seek", "seek_to"):
+                    self._cancel_up_next()  # going back to see the end again: stay here
+                    self._announce_later()
                 try:
                     self._session.command(action, value, osd=osd)
                 except (TypeError, ValueError) as error:
@@ -490,7 +538,7 @@ class Controller:
         tracks = self._playback.audio if kind == "audio" else self._playback.subs
         pick = pick_of(tracks, None if value is None else int(value))
         if pick is not None and not (kind == "audio" and pick.off):
-            self.progress.pick(self.library.root, _owner(self._video), kind, pick)
+            self.progress.pick(self._video_root, _owner(self._video), kind, pick)
 
     def _cycle(self, kind: str) -> None:
         """The next audio track, or subtitles (then none): mpv's B and V keys."""
@@ -671,15 +719,18 @@ class Controller:
 
         self._worker.submit(run)
 
-    def _session_ended(self, generation: int, rect: Rect | None) -> None:
+    def _session_ended(self, generation: int, failed: bool, rect: Rect | None) -> None:
         def run() -> None:
             with self._lock:
                 if generation != self._generation or self._session is None:
                     return
                 self._cancel_up_next()
-                self._save_current(finished=False)
+                if not failed:  # it never started: where it was left still holds
+                    self._save_current(finished=False)
                 self._close_session()
                 self._back_to_nanar(rect)
+            if failed:
+                self._tell("cannot_play")
             self._announce()
 
         self._worker.submit(run)
@@ -709,8 +760,13 @@ class Controller:
         with self._lock:
             if generation != self._generation or self._up_next is None:
                 return
-            self._up_next_seconds -= 1
-            self._tick(generation)
+            if self._sleep == "end":  # asked for during the countdown
+                self._cancel_up_next()
+                rect = self._close_session()
+                self._back_to_nanar(rect)
+            else:
+                self._up_next_seconds -= 1
+                self._tick(generation)
         self._announce()
 
     def _play_up_next(self, generation: int, following: Video) -> None:
@@ -739,7 +795,7 @@ class Controller:
         if not finished and p.position <= 0 and p.duration is None:
             return  # nothing played yet: keep what was saved before
         self.progress.save(
-            self.library.root, self._video.path, p.position, p.duration, finished=finished
+            self._video_root, self._video.path, p.position, p.duration, finished=finished
         )
         self._saved_at = p.position
 
@@ -763,7 +819,8 @@ class Controller:
     def _source_of(self, video: Video) -> str:
         if "://" in video.path:
             return video.path  # the demo's generated videos
-        return str(Path(self.library.root) / video.path)
+        root = self._video_root if video is self._video else self.library.root
+        return str(Path(root) / video.path)
 
     def _save_settings(self) -> None:
         if self._settings_path is not None:
@@ -802,5 +859,5 @@ class _SessionCallbacks:
     def finished(self) -> None:
         self._controller._session_finished(self._generation)
 
-    def ended(self, finished: bool, rect: Rect | None) -> None:
-        self._controller._session_ended(self._generation, rect)
+    def ended(self, failed: bool, rect: Rect | None) -> None:
+        self._controller._session_ended(self._generation, failed, rect)

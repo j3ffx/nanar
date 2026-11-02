@@ -140,3 +140,28 @@ def test_plays_with_the_tracks_picked_before_and_night_mode() -> None:
         assert recorder.latest.chapters == 0
     finally:
         session.close()
+
+
+def test_the_next_video_never_reports_the_position_of_the_last_one() -> None:
+    recorder = Recorder()
+    session = MpvSession(Start(demo.source(0, 60), "Démo", length=60.0), Settings(), recorder)
+    seen: list[float] = []
+    try:
+        recorder.wait(lambda p: p.position > 0.2)
+        session.command("mute", True)
+        recorder.wait(lambda p: p.muted)
+        session.command("seek_to", 40)
+        recorder.wait(lambda p: p.position >= 39)
+        real_changed = recorder.changed
+
+        def watching(playback: Playback) -> None:
+            seen.append(playback.position)
+            real_changed(playback)
+
+        session.load(Start(demo.source(1, 60), "Suite", length=60.0))
+        recorder.changed = watching  # type: ignore[method-assign]
+        recorder.wait(lambda p: 0.2 < p.position < 30)
+        assert recorder.latest.muted  # mpv keeps it, and the phone must go on saying so
+        assert all(position < 30 for position in seen)
+    finally:
+        session.close()
