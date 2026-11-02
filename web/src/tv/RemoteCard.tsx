@@ -6,6 +6,8 @@ import styles from './RemoteCard.module.css';
 
 const REFRESH_MS = 30_000; // the PC may change networks (a hotel, a phone's hotspot)
 const PAIRED_BEFORE = 'nanar.phoneSeen'; // localStorage: a phone has come at least once
+const BLOCKED =
+  'Le pare-feu de Windows semble bloquer les téléphones : « Connecter un téléphone ».';
 
 function pairedBefore(): boolean {
   try {
@@ -17,7 +19,15 @@ function pairedBefore(): boolean {
 
 /** The QR code that turns a phone into the remote; a single line once one has come, as a phone
  *  gone to sleep shouldn't bring a big code back over the library every evening. */
-export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | null }) {
+export function RemoteCard({
+  phones,
+  wifi,
+  firewallBlocks,
+}: {
+  phones: number;
+  wifi: string | null;
+  firewallBlocks: string | null;
+}) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [seen, setSeen] = useState(pairedBefore);
 
@@ -48,6 +58,8 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
 
   if (!pairing) return null;
 
+  const blocked = firewallBlocks !== null && phones === 0;
+
   if (!pairing.lan || !pairing.url) {
     return (
       <aside className={styles.card} data-compact>
@@ -70,6 +82,7 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
               : '1 téléphone connecté.'}
           {wifi && ` Wi-Fi « ${wifi} ».`}
         </p>
+        {blocked && <p className={styles.text}>{BLOCKED}</p>}
       </aside>
     );
   }
@@ -87,7 +100,9 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
         <p className={styles.text}>
           Scanne ce code avec l’appareil photo du téléphone, connecté au même réseau que le PC.
         </p>
-        <p className={styles.text}>Rien ne s’ouvre ? « Connecter un téléphone », en haut.</p>
+        <p className={styles.text}>
+          {blocked ? BLOCKED : 'Rien ne s’ouvre ? « Connecter un téléphone », en haut.'}
+        </p>
         {wifi && <p className={styles.text}>Sur le Wi-Fi « {wifi} » (mode hôtel).</p>}
       </div>
     </aside>

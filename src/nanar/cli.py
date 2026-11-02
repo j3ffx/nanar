@@ -79,7 +79,7 @@ def open_folder(
         return
 
     from nanar import demo as demo_library
-    from nanar import hotspot
+    from nanar import firewall, hotspot
     from nanar.app import Network, create_app
     from nanar.discovery import HOST, Announcer
     from nanar.folders import Folders
@@ -177,6 +177,22 @@ def open_folder(
     hotspot_stop = threading.Event()
     threading.Thread(target=watch_hotspot, name="nanar-hotspot", daemon=True).start()
 
+    FIREWALL_WATCH_SECONDS = 60.0
+
+    def watch_firewall() -> None:
+        # The network changes, and the user ticks the box. Not during a film, nor while a phone is
+        # there: it got through.
+        while True:
+            now = controller.state()
+            if now["playing"] is None and now["phones"] == 0:
+                controller.set_firewall(firewall.check(sys.executable))
+            if firewall_stop.wait(FIREWALL_WATCH_SECONDS):
+                return
+
+    firewall_stop = threading.Event()
+    if not local:
+        threading.Thread(target=watch_firewall, name="nanar-firewall", daemon=True).start()
+
     app_holder: list[Desktop] = []
     app = create_app(
         controller,
@@ -206,6 +222,7 @@ def open_folder(
             folders.stop,
             announcer.stop,
             hotspot_stop.set,
+            firewall_stop.set,
             wifi.close,
         ):
             try:  # one that fails must not leave the others, the hotspot above all, running

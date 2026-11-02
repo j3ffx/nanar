@@ -7,8 +7,8 @@ restes dans ton canapé. Nanar range ta bibliothèque tout seul (les sagas ensem
 les épisodes par saison), affiche tout ça en grand sur la télé, et lit n’importe quelle vidéo :
 mkv, HEVC, AV1, sous-titres intégrés ou à côté du fichier, VF ou VO.
 
-> Pour Windows ; Linux et macOS depuis les sources. Ce que chaque version apporte :
-> [les nouveautés](CHANGELOG.md).
+> Pour Windows. Depuis les sources, Nanar tourne aussi sous Linux ; macOS n’est pas testé. Ce que
+> chaque version apporte : [les nouveautés](CHANGELOG.md).
 
 ![L’accueil sur la télé, en mode démo : « À suivre », puis « Récemment ajoutés »](docs/capture-tele.png)
 
@@ -67,7 +67,7 @@ Sur **Windows 10 ou 11** :
    complémentaires », puis « Exécuter quand même » (ou « Exécuter »).
 4. Windows demande aussi s’il faut laisser Nanar communiquer sur le réseau : coche **les réseaux
    privés et publics** (un Wi-Fi d’hôtel est « public » pour Windows), sinon le téléphone ne
-   trouvera pas le PC.
+   trouvera pas le PC. S’il manque une case, la télé te le dit et explique où la cocher.
 5. Choisis le dossier de tes films sur la télé. Nanar propose de s’ajouter au menu Démarrer et au
    clic droit sur les dossiers (« Ouvrir avec Nanar ») : c’est toi qui décides.
 
@@ -87,9 +87,9 @@ veux aussi effacer tes réglages et ta progression.
 
 ### Depuis les sources
 
-Sur Linux, macOS, ou pour contribuer. Il faut [uv](https://docs.astral.sh/uv/),
-[Node.js](https://nodejs.org/) 22 et libmpv (`apt install libmpv2`, `brew install mpv` ; sous
-Windows, `scripts/get-libmpv.py` le télécharge) :
+Sur Linux, ou pour contribuer. Il faut [uv](https://docs.astral.sh/uv/),
+[Node.js](https://nodejs.org/) 22 et libmpv (`apt install libmpv2` ; sous Windows,
+`scripts/get-libmpv.py` le télécharge) :
 
 ```bash
 npm ci && uv sync

@@ -102,6 +102,8 @@ export interface State {
     /** Windows has been asked at least once (it takes seconds). */
     checked: boolean;
   };
+  /** The kind of network where Windows' firewall keeps the phones out, if any. */
+  firewallBlocks: string | null;
   /** The last thing gone wrong on its own, to say once (a video that can't play). */
   notice: { code: string; seq: number } | null;
   /** New versions of the Windows build, looked for on GitHub when the user said so. */

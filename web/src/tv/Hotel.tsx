@@ -20,15 +20,24 @@ const MESSAGES: Record<string, string> = {
     'Windows n’a pas voulu ouvrir le Wi-Fi. Réessaie, ou ouvre-le dans Paramètres › Réseau et Internet › Point d’accès sans fil mobile.',
 };
 
+// How Windows names the kinds of network in the firewall's list.
+const NETWORKS: Record<string, string> = {
+  Private: 'privés',
+  Public: 'publics',
+  Domain: 'de domaine',
+};
+
 const POLL_MS = 20_000; // Windows closes a hotspot nobody uses, and has its own switch
 
 /** When the phone doesn't reach Nanar: what to check, and mode hôtel, the PC's own Wi-Fi. */
 export function Hotel({
   hotspot,
+  firewallBlocks,
   playing,
   onBack,
 }: {
   hotspot: State['hotspot'];
+  firewallBlocks: string | null;
   playing: boolean;
   onBack: () => void;
 }) {
@@ -129,17 +138,30 @@ export function Hotel({
               <p className={styles.settingTitle}>
                 Scanne ce code avec l’appareil photo du téléphone.
               </p>
+              {firewallBlocks && (
+                <p className={styles.note} role="status">
+                  <strong>
+                    Le pare-feu de Windows semble bloquer les téléphones sur ce réseau.
+                  </strong>{' '}
+                  Dans le menu Démarrer, tape « pare-feu », ouvre « Autoriser une application via le
+                  Pare-feu Windows », clique sur « Modifier les paramètres », et coche Nanar pour
+                  les réseaux {NETWORKS[firewallBlocks] ?? 'privés et publics'}. Il faut être
+                  administrateur du PC.
+                </p>
+              )}
               <p className={styles.note}>Rien ne s’ouvre ?</p>
               <ul className={styles.checks}>
                 <li>
                   Le téléphone doit être connecté au même réseau que le PC (sa box, pas la 4G ou la
                   5G).
                 </li>
-                <li>
-                  Pare-feu : dans le menu Démarrer, tape « pare-feu », ouvre « Autoriser une
-                  application via le Pare-feu Windows », et coche Nanar pour les réseaux privés et
-                  publics.
-                </li>
+                {!firewallBlocks && (
+                  <li>
+                    Pare-feu : dans le menu Démarrer, tape « pare-feu », ouvre « Autoriser une
+                    application via le Pare-feu Windows », et coche Nanar pour les réseaux privés et
+                    publics.
+                  </li>
+                )}
                 <li>Certains Wi-Fi, surtout à l’hôtel, isolent les appareils : voici la parade.</li>
               </ul>
             </div>

@@ -137,6 +137,10 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   shows its name and password as a Wi-Fi QR code (this machine's page only, never in the live state
   or a log), points the remote's QR code at the hotspot's address, and turns it off on exit if it
   turned it on.
+- **The firewall is read, never written** (`firewall.py`). Windows' rules for the program are read
+  (no administrator needed) at start, then every minute unless a video plays or a phone is there; the
+  TV page says when a network looks blocked and where to tick the box. No rule at all says nothing:
+  Windows asks by itself. In doubt, say nothing.
 - **One Nanar at a time.** A second launch hands its folder to the running one (`/api/open`) and
   stops; a page can't do that, only a process on this machine.
 - **The Windows build has no console**: output goes to `nanar.log` in the data directory.
@@ -156,7 +160,8 @@ Nothing personal goes into code, tests, fixtures, docs, commit messages or commi
   - Playback: `player.py` (mpv's window, VLC-like keys), `controller.py` (the single place where
     state changes).
   - Pages and phones: `app.py` (API, WebSocket, pages, manifest), `security.py` and `pairing.py`
-    (who may drive Nanar), `discovery.py` (`nanar.local`), `hotspot.py` (mode hôtel).
+    (who may drive Nanar), `discovery.py` (`nanar.local`), `hotspot.py` (mode hôtel), `firewall.py`
+    (whether Windows lets the phones in).
   - Opt-in services: `online.py`, `metadata.py`, `subtitles.py`, `updates.py`.
   - The rest: `cli.py`, `config.py` (data directory, settings), `system.py` (the system's programs,
     by full path), `desktop/` (the pywebview window, Win32 calls placing windows, the menus),
@@ -185,3 +190,8 @@ them; the smallest touches get no version of their own and wait for the next one
 French, for users) says what each version brings; a lightweight tag `vX.Y.Z` makes
 `.github/workflows/release.yml` publish the GitHub release with that version's notes, the Windows
 zip and its SHA-256 (built on Windows by `scripts/build-windows.py`), and the Python package.
+
+From `1.0.0` on, a version keeps three promises, and a major version is what it takes to break one:
+the user's data survives every update (`tests/test_progress.py` holds the oldest database), a paired
+phone stays paired, and the one-click update reaches the next version. Windows is the supported
+platform; Linux runs from the sources; macOS is untested.

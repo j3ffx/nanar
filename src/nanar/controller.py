@@ -149,6 +149,7 @@ class Controller:
             "ssid": None,
             "code": None,
         }
+        self._firewall_blocks: str | None = None  # the kind of network keeping the phones out
 
     # Listeners ---------------------------------------------------------------------------------
 
@@ -211,6 +212,7 @@ class Controller:
                 "night": self._night,
                 "sleep": sleep,
                 "hotspot": dict(self._hotspot),
+                "firewallBlocks": self._firewall_blocks,
                 "updates": self.updates.state() if self.updates else None,
                 "online": {
                     "posters": bool(self.metadata and self.metadata.enabled),
@@ -321,6 +323,14 @@ class Controller:
             if public == self._hotspot:
                 return
             self._hotspot = dict(public)
+        self._announce()
+
+    def set_firewall(self, blocks: str | None) -> None:
+        """The kind of network where Windows' firewall keeps the phones out, if any."""
+        with self._lock:
+            if blocks == self._firewall_blocks:
+                return
+            self._firewall_blocks = blocks
         self._announce()
 
     def set_phones(self, count: int) -> None:

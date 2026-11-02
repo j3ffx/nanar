@@ -188,6 +188,7 @@ export function Tv() {
                     checked: false,
                   }
                 }
+                firewallBlocks={state?.firewallBlocks ?? null}
                 playing={!!state?.playing}
                 onBack={back}
               />
@@ -238,6 +239,7 @@ export function Tv() {
         <RemoteCard
           phones={state?.phones ?? 0}
           wifi={state?.hotspot.on ? state.hotspot.ssid : null}
+          firewallBlocks={state?.firewallBlocks ?? null}
         />
       )}
       {error && (
