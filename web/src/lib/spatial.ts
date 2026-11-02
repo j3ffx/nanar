@@ -44,9 +44,14 @@ export const DIRECTIONS: Record<string, Direction> = {
   ArrowRight: 'right',
 };
 
+/** Smooth, unless the user asked for less motion: an explicit `smooth` overrides the CSS. */
+export function scrollBehavior(): ScrollBehavior {
+  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
 /** Moves the focus among the elements marked `data-nav` inside `root`. */
 export function moveFocus(root: ParentNode, direction: Direction): boolean {
-  const items = [...root.querySelectorAll<HTMLElement>('[data-nav]')];
+  const items = [...root.querySelectorAll<HTMLElement>('[data-nav]:not(:disabled)')];
   if (items.length === 0) return false;
   const current = document.activeElement as HTMLElement | null;
   if (!current || !items.includes(current)) {
@@ -61,6 +66,6 @@ export function moveFocus(root: ParentNode, direction: Direction): boolean {
   if (index === -1) return false;
   const target = items[index];
   target?.focus();
-  target?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  target?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: scrollBehavior() });
   return true;
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import {
-  ApiError,
   fetchOnline,
   setCheckUpdates,
   setOnline,
@@ -12,23 +11,37 @@ import {
 import { BackButton } from './BackButton';
 import styles from './Tv.module.css';
 
-const MESSAGES: Record<string, string> = {
-  bad_key: 'Cette clé est refusée.',
-  offline: 'Pas de réponse : le PC est-il connecté à Internet ?',
-  quota_reached: 'Le service refuse pour l’instant : réessaie plus tard.',
+const LAST_ERROR: Record<string, string> = {
+  bad_key: 'TMDB refuse cette clé : change-la.',
+  offline: 'TMDB ne répondait pas : Nanar réessaiera à la prochaine ouverture.',
+  quota_reached: 'TMDB refuse pour l’instant : Nanar réessaiera à la prochaine ouverture.',
 };
 
-type Service = 'tmdb' | 'opensubtitles';
-
-/** The settings, on this machine only: the keys of the online services, off by default. */
-export function Settings({ updates, onBack }: { updates: State['updates']; onBack: () => void }) {
-  const [online, setOnlineState] = useState<OnlineSettings | null>(null);
+/** The settings, on this machine only: what may talk to the Internet (nothing by default). */
+export function Settings({
+  updates,
+  onBack,
+  onNavigate,
+}: {
+  updates: State['updates'];
+  onBack: () => void;
+  onNavigate: (path: string) => void;
+}) {
+  const [online, setState] = useState<OnlineSettings | null>(null);
   const reload = () =>
     fetchOnline()
-      .then(setOnlineState)
+      .then(setState)
       .catch(() => {});
   useEffect(() => {
-    void reload();
+    void reload().then(() => {
+      // The buttons have only just come: the focus goes to the first, rather than "Retour".
+      if (
+        document.activeElement?.hasAttribute('data-back') ||
+        document.activeElement === document.body
+      ) {
+        document.querySelector<HTMLElement>('main [data-nav]:not([data-back])')?.focus();
+      }
+    });
   }, []);
 
   return (
@@ -38,39 +51,33 @@ export function Settings({ updates, onBack }: { updates: State['updates']; onBac
         Réglages
       </h2>
       <p className={styles.lead}>
-        Nanar ne parle à Internet que si tu lui donnes une clé ci-dessous, et seulement au service
-        de cette clé. Il envoie le titre et l’année lus dans le nom du fichier (et, pour les
-        sous-titres, l’empreinte de la vidéo) ; rien d’autre ne quitte le PC.
+        Par défaut, Nanar ne parle à personne sur Internet. Chacune de ces options, désactivée au
+        départ, le fait parler à un seul service, qui voit l’adresse Internet de ta connexion, comme
+        tout site.
       </p>
       {online && (
         <>
-          <KeyField
-            service="tmdb"
-            title="Affiches et résumés (TMDb)"
-            help="Une clé d’API gratuite : compte sur themoviedb.org, puis Paramètres › API."
+          <Service
+            title="Affiches et résumés (TMDB)"
+            what="Nanar envoie à TMDB le titre et l’année lus dans le nom de chaque vidéo du dossier, vidéos personnelles comprises."
             state={online.tmdb}
-            onSaved={reload}
+            problem={online.tmdb.error ? (LAST_ERROR[online.tmdb.error] ?? null) : null}
+            onOpen={() => onNavigate('/reglages/tmdb')}
+            onRemove={() => void setOnline({ tmdb: '' }).then(reload)}
           />
-          {online.tmdb.error && (
-            <p className={styles.note}>
-              Dernière recherche interrompue : {MESSAGES[online.tmdb.error] ?? online.tmdb.error}
-            </p>
-          )}
-          <KeyField
-            service="opensubtitles"
+          <Service
             title="Sous-titres en ligne (OpenSubtitles)"
-            help="Une clé gratuite : compte sur opensubtitles.com, puis « API consumers ». Cinq sous-titres par jour."
+            what="Quand tu en cherches depuis la télécommande, puis tout seul pour les épisodes suivants : le titre, l’année, l’épisode, et une empreinte du fichier (un calcul qui permet de trouver des sous-titres calés, sans dévoiler son contenu)."
             state={online.opensubtitles}
-            onSaved={reload}
+            problem={null}
+            onOpen={() => onNavigate('/reglages/opensubtitles')}
+            onRemove={() => void setOnline({ opensubtitles: '' }).then(reload)}
           />
-          <p className={styles.note}>
-            Ce produit utilise l’API TMDB mais n’est ni approuvé ni certifié par TMDB.
-          </p>
         </>
       )}
       {updates && (
         <div className={styles.setting}>
-          <p className={styles.settingTitle}>Mises à jour</p>
+          <h3 className={styles.settingTitle}>Mises à jour</h3>
           {updates.supported ? (
             <>
               <label className={styles.check}>
@@ -83,101 +90,73 @@ export function Settings({ updates, onBack }: { updates: State['updates']; onBac
                     if (event.key === 'Enter') void setCheckUpdates(!updates.enabled);
                   }}
                 />
-                Chercher les nouvelles versions (une fois par jour, sur GitHub)
+                Chercher les nouvelles versions sur GitHub (au démarrage, puis une fois par jour)
               </label>
-              <p className={styles.note}>
-                {updates.available
-                  ? `Nanar ${updates.available} est sorti : la bibliothèque propose de l’installer.`
-                  : updates.enabled
-                    ? 'Tu es à jour.'
-                    : 'Désactivé : Nanar ne demande rien à GitHub.'}
-              </p>
+              <p className={styles.note}>{updateNote(updates)}</p>
             </>
           ) : (
-            <p className={styles.note}>Lancé depuis les sources : `git pull` le met à jour.</p>
+            <p className={styles.note}>
+              Nanar {updates.version}. Lancé depuis les sources : <code>git pull</code> le met à
+              jour.
+            </p>
           )}
         </div>
       )}
+      <p className={styles.note}>
+        Ce produit utilise l’API TMDB mais n’est ni approuvé ni certifié par TMDB.
+      </p>
     </section>
   );
 }
 
-function KeyField(props: {
-  service: Service;
+function updateNote(updates: NonNullable<State['updates']>): string {
+  const version = `Nanar ${updates.version}.`;
+  if (updates.available)
+    return `${version} La version ${updates.available} est sortie : la bibliothèque propose de l’installer.`;
+  if (!updates.enabled) return `${version} Désactivé : Nanar ne demande rien à GitHub.`;
+  if (!updates.checkedAt) return `${version} Pas encore vérifié.`;
+  const day = new Date(updates.checkedAt * 1000).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+  });
+  return `${version} À jour à la dernière vérification (${day}).`;
+}
+
+function Service(props: {
   title: string;
-  help: string;
+  what: string;
   state: { set: boolean; hint: string | null };
-  onSaved: () => void;
+  problem: string | null;
+  onOpen: () => void;
+  onRemove: () => void;
 }) {
-  const [value, setValue] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const save = (key: string) => {
-    setBusy(true);
-    setMessage(null);
-    setOnline({ [props.service]: key })
-      .then(() => {
-        setValue('');
-        setMessage(key ? 'Clé enregistrée.' : 'Clé retirée : plus rien n’est demandé.');
-        props.onSaved();
-      })
-      .catch((e: unknown) => {
-        const code = e instanceof ApiError ? e.code : 'offline';
-        setMessage(MESSAGES[code] ?? MESSAGES.offline!);
-      })
-      .finally(() => setBusy(false));
-  };
-  const id = `key-${props.service}`;
   return (
     <div className={styles.setting}>
-      <label htmlFor={id} className={styles.settingTitle}>
-        {props.title}
-      </label>
+      <h3 className={styles.settingTitle}>{props.title}</h3>
+      <p className={styles.note}>{props.what}</p>
       <p className={styles.note}>
-        {props.state.set ? `Activé, avec la clé ${props.state.hint ?? ''}.` : 'Désactivé.'}{' '}
-        {props.help}
+        {props.state.set ? `Activé, avec la clé ${props.state.hint ?? ''}.` : 'Désactivé.'}
       </p>
+      {props.problem && (
+        <p className={styles.note} role="alert">
+          {props.problem}
+        </p>
+      )}
       <div className={styles.settingRow}>
-        <input
-          id={id}
-          data-nav
-          className={styles.input}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={props.state.set ? 'Nouvelle clé' : 'Colle ta clé ici'}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && value.trim()) save(value.trim());
-          }}
-        />
         <button
           type="button"
           data-nav
-          className={styles.action}
-          disabled={busy || !value.trim()}
-          onClick={() => save(value.trim())}
+          className={props.state.set ? styles.backButton : styles.action}
+          onClick={props.onOpen}
         >
-          {busy ? 'Vérification…' : 'Enregistrer'}
+          {props.state.set ? 'Changer la clé' : 'Activer : obtenir une clé'}
         </button>
         {props.state.set && (
-          <button
-            type="button"
-            data-nav
-            className={styles.backButton}
-            disabled={busy}
-            onClick={() => save('')}
-          >
-            Retirer
+          <button type="button" data-nav className={styles.backButton} onClick={props.onRemove}>
+            Retirer la clé
           </button>
         )}
       </div>
-      {message && (
-        <p className={styles.note} role="status">
-          {message}
-        </p>
-      )}
     </div>
   );
 }

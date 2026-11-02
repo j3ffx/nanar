@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 
 import { play, type Library } from '@/lib/api';
 import { countLabel, episodeCode, hueOf, shortTitle } from '@/lib/format';
-import { ratioOf, resumeLabel } from '@/lib/progress';
+import { groupNext, ratioOf, resumeLabel } from '@/lib/progress';
 
 import { BackButton } from './BackButton';
 import styles from './Tv.module.css';
@@ -28,7 +28,11 @@ export function GroupPage({ library, groupId, onBack, onError }: Props) {
       </div>
     );
   }
-  const start = (id: string) => play(id).catch(() => onError('Cette vidéo ne veut pas démarrer.'));
+  const start = (id: string) =>
+    play(id).catch(() =>
+      onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'),
+    );
+  const next = groupNext(library, group)?.id; // where the arrows start: where you left off
 
   return (
     <section aria-labelledby="group-title">
@@ -49,6 +53,7 @@ export function GroupPage({ library, groupId, onBack, onError }: Props) {
                 type="button"
                 data-nav
                 data-id={id}
+                data-resume={id === next || undefined}
                 className={styles.row}
                 onClick={() => void start(id)}
               >

@@ -41,10 +41,10 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
   const [main, ...others] = pairing.name ? [pairing.name, ...pairing.addresses] : pairing.addresses;
   return (
     <aside className={styles.card} data-compact={phones > 0 || undefined}>
-      {/* The URL is in the query so that the image changes with the network. */}
+      {/* The address is in the query so that the image changes with the network. */}
       <img
         className={styles.qr}
-        src={`/api/pairing/qr.svg?for=${encodeURIComponent(pairing.url)}`}
+        src={`/api/pairing/qr.svg?for=${encodeURIComponent(pairing.addresses[0] ?? '')}`}
         alt="QR code de la télécommande"
       />
       <div className={styles.body}>
@@ -56,7 +56,9 @@ export function RemoteCard({ phones, wifi }: { phones: number; wifi: string | nu
             : 'Ton téléphone est la télécommande'}
         </p>
         <p className={styles.text}>
-          {phones > 0 ? 'Un autre ? Scanne le code.' : 'Scanne ce code avec son appareil photo.'}
+          {phones > 0
+            ? 'Un autre ? Scanne le code.'
+            : 'Sur le même Wi-Fi que le PC, scanne ce code avec son appareil photo. Rien ne s’ouvre ? Bouton « Téléphone », en haut.'}
         </p>
         {wifi && <p className={styles.text}>Sur le Wi-Fi « {wifi} » (mode hôtel).</p>}
         <p className={styles.address}>

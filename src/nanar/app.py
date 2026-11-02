@@ -5,6 +5,7 @@ Who may call what is decided in `security.py`; phones pair with the key the TV s
 
 import asyncio
 import io
+import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib.resources import files
@@ -23,6 +24,10 @@ from nanar.pairing import lan_addresses, remote_url
 from nanar.security import COOKIE, AccessMiddleware, Caller, key_matches
 
 TEN_YEARS = 10 * 365 * 24 * 3600
+LINKS = {
+    "tmdb": "https://www.themoviedb.org/settings/api",
+    "opensubtitles": "https://www.opensubtitles.com/consumers",
+}
 TICK_SECONDS = 10.0  # at least this often, a phone hears from Nanar: silence means it is gone
 
 
@@ -64,6 +69,10 @@ class IntegrationBody(BaseModel):
 
 class HotspotBody(BaseModel):
     on: bool
+
+
+class LinkBody(BaseModel):
+    target: Literal["tmdb", "opensubtitles"]
 
 
 class UpdatesBody(BaseModel):
@@ -274,6 +283,15 @@ def create_app(
         if not _caller(request).local or not (status.on and status.ssid and status.passphrase):
             return JSONResponse({"code": "no_hotspot"}, status_code=404)
         return _svg(wifi_qr(status.ssid, status.passphrase))
+
+    @app.post("/api/link", status_code=204, response_model=None)
+    async def open_link(body: LinkBody, request: Request) -> JSONResponse | None:
+        """Opens where to get a key in the PC's browser: a fixed list, from this machine only."""
+        if not _caller(request).local:
+            return JSONResponse({"code": "this_machine_only"}, status_code=403)
+        if not await asyncio.to_thread(webbrowser.open, LINKS[body.target]):
+            raise CommandError("no_browser")
+        return None
 
     @app.post("/api/updates", status_code=204, response_model=None)
     async def check_updates(body: UpdatesBody, request: Request) -> JSONResponse | None:

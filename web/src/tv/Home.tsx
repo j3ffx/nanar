@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useState } from 'react';
 
 import {
+  ApiError,
   answerIntegration,
   chooseFolder,
   installUpdate,
@@ -38,7 +39,10 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
   const groups = library.entries.filter((e) => e.kind === 'group');
   const films = library.entries.filter((e) => e.kind === 'video');
 
-  const choose = () => chooseFolder().catch(() => onError('Ce dossier ne s’ouvre pas.'));
+  const choose = () =>
+    chooseFolder().catch(() =>
+      onError('Impossible d’ouvrir ce dossier. Vérifie qu’il existe et que le disque est branché.'),
+    );
 
   if (library.root === '') {
     return (
@@ -64,7 +68,10 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
     );
   }
 
-  const start = (id: string) => play(id).catch(() => onError('Cette vidéo ne veut pas démarrer.'));
+  const start = (id: string) =>
+    play(id).catch(() =>
+      onError('Impossible de lire cette vidéo : le fichier a peut-être été déplacé.'),
+    );
 
   const groupPoster = (id: string, key = id) => {
     const group = library.groups[id]!;
@@ -130,8 +137,12 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
                 type="button"
                 data-nav
                 onClick={() =>
-                  void installUpdate().catch(() =>
-                    onError('La mise à jour a échoué : réessaie plus tard.'),
+                  void installUpdate().catch((error: unknown) =>
+                    onError(
+                      error instanceof ApiError && error.code === 'bad_checksum'
+                        ? 'Le fichier téléchargé est abîmé : rien n’a été changé. Réessaie plus tard.'
+                        : 'La mise à jour n’a pas pu se faire : rien n’a été changé.',
+                    ),
                   )
                 }
               >
@@ -217,12 +228,6 @@ export function Home({ library, filter, onBack, update, offerIntegration, onErro
         {library.root}
         <button type="button" data-nav onClick={() => void choose()}>
           Changer de dossier
-        </button>
-        <button type="button" data-nav onClick={() => navigate('/hotel')}>
-          Mode hôtel
-        </button>
-        <button type="button" data-nav onClick={() => navigate('/reglages')}>
-          Réglages
         </button>
       </p>
     </>

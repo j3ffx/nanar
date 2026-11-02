@@ -357,7 +357,7 @@ class MpvSession:
             case "night":
                 on = bool(value) if value is not None else not self._playback.night
                 m.af = NIGHT_FILTER if on else ""
-                message = "Mode nuit" if on else "Mode nuit désactivé"
+                message = "Son de nuit" if on else "Son normal"
             case "chapter":
                 count = int(m.chapters or 0)
                 if count == 0:
@@ -475,7 +475,8 @@ class MpvSession:
                 else:  # moved back from the end: reaching it again is a new end
                     self._at_end = False
                 return
-        self._callbacks.changed(p)
+        if p is self._playback:  # not the last video's, if another just started
+            self._callbacks.changed(p)
 
     def _apply_picks(self, p: Playback) -> None:
         """Adds the subtitles downloaded before, and selects the tracks picked by hand in

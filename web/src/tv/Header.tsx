@@ -8,7 +8,6 @@ const TAGLINES = [
   'Un nanar, c’est un navet qu’on aime.',
   'Popcorn non fourni.',
   'Ne quittez pas votre canapé.',
-  'Le plus beau des navets, c’est le tien.',
   'Effets spéciaux garantis d’époque.',
 ];
 
@@ -23,7 +22,13 @@ function useNow(): Date {
   return now;
 }
 
-export function Header({ demo }: { demo: boolean }) {
+export function Header({
+  demo,
+  onNavigate,
+}: {
+  demo: boolean;
+  onNavigate: (path: string) => void;
+}) {
   const now = useNow();
   const [line, setLine] = useState(0);
   useEffect(() => {
@@ -43,6 +48,24 @@ export function Header({ demo }: { demo: boolean }) {
       </div>
       <div className={styles.side}>
         {demo && <span className={styles.demo}>Démo</span>}
+        <button
+          type="button"
+          data-nav
+          data-id="open-phone"
+          className={styles.link}
+          onClick={() => onNavigate('/hotel')}
+        >
+          Téléphone
+        </button>
+        <button
+          type="button"
+          data-nav
+          data-id="open-settings"
+          className={styles.link}
+          onClick={() => onNavigate('/reglages')}
+        >
+          Réglages
+        </button>
         <time className={styles.clock} dateTime={now.toISOString()}>
           {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </time>

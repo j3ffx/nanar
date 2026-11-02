@@ -133,7 +133,7 @@
 }
 
 .detail {
-  font-size: clamp(0.85rem, 1vw, 1.05rem);
+  font-size: clamp(0.9rem, 1.1vw, 1.9rem);
   color: rgb(255 255 255 / 0.85);
 }
 

@@ -1,32 +1,47 @@
 import { useEffect, useState } from 'react';
 
-import { ApiError, fetchPairing, turnHotspot, type Pairing, type State } from '@/lib/api';
+import {
+  ApiError,
+  fetchHotspot,
+  fetchPairing,
+  turnHotspot,
+  type Pairing,
+  type State,
+} from '@/lib/api';
 
 import { BackButton } from './BackButton';
 import styles from './Tv.module.css';
 
 const MESSAGES: Record<string, string> = {
-  no_internet: 'Il faut au PC une connexion à partager (le Wi-Fi de l’hôtel, ou un câble).',
-  unavailable: 'Ce PC ne sait pas ouvrir de Wi-Fi (ou Windows l’interdit ici).',
+  no_internet:
+    'Windows ne partage un Wi-Fi que si le PC a une connexion à Internet : connecte-le au Wi-Fi de l’hôtel (ou à un câble), puis réessaie.',
+  unavailable: 'Ce PC ne sait pas ouvrir de Wi-Fi, ou Windows l’interdit sur ce réseau.',
   failed: 'Windows n’a pas voulu ouvrir le Wi-Fi. Réessaie, ou ouvre-le dans ses paramètres.',
 };
 
-/** Mode hôtel: the PC opens a Wi-Fi of its own, which the phone joins in one scan. */
+const POLL_MS = 5000; // Windows closes a hotspot nobody uses, and has its own switch
+
+/** When the phone doesn't reach Nanar: what to check, and mode hôtel, the PC's own Wi-Fi. */
 export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pairing, setPairing] = useState<Pairing | null>(null);
 
-  // The remote's address changes once the phone is on the PC's Wi-Fi: ask again then.
   useEffect(() => {
     let alive = true;
-    fetchPairing()
-      .then((p) => alive && setPairing(p))
-      .catch(() => {});
+    const load = () => {
+      fetchPairing()
+        .then((p) => alive && setPairing(p))
+        .catch(() => {});
+      fetchHotspot().catch(() => {}); // the live state brings the answer
+    };
+    load();
+    const timer = setInterval(load, POLL_MS);
     return () => {
       alive = false;
+      clearInterval(timer);
     };
-  }, [hotspot.on]);
+  }, []);
 
   const turn = (on: boolean) => {
     setBusy(true);
@@ -39,17 +54,20 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
       .finally(() => setBusy(false));
   };
 
+  const remote = pairing?.url && (
+    <img
+      className={styles.stepQr}
+      src={`/api/pairing/qr.svg?for=${encodeURIComponent(pairing.addresses[0] ?? '')}`}
+      alt="QR code de la télécommande"
+    />
+  );
+
   return (
     <section aria-labelledby="hotel-title" className={styles.page}>
       <BackButton onBack={onBack} />
       <h2 id="hotel-title" className={styles.groupTitle}>
-        Mode hôtel
+        Connecter le téléphone
       </h2>
-      <p className={styles.lead}>
-        Le Wi-Fi d’un hôtel isole souvent les appareils : le téléphone ne voit pas le PC. Nanar peut
-        ouvrir un Wi-Fi à lui, que ton téléphone rejoint d’un scan ; le PC garde sa connexion et la
-        partage.
-      </p>
       {hotspot.on ? (
         <>
           <ol className={styles.steps}>
@@ -64,13 +82,9 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
                 l’appareil photo du téléphone.
               </p>
             </li>
-            {pairing?.url && (
+            {remote && (
               <li className={styles.step}>
-                <img
-                  className={styles.stepQr}
-                  src={`/api/pairing/qr.svg?for=${encodeURIComponent(pairing.url)}`}
-                  alt="QR code de la télécommande"
-                />
+                {remote}
                 <p>
                   <strong>2.</strong> Puis ouvre la télécommande avec celui-ci.
                 </p>
@@ -84,12 +98,35 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
             disabled={busy}
             onClick={() => turn(false)}
           >
-            {busy ? 'Fermeture…' : 'Fermer le Wi-Fi de Nanar'}
+            {busy ? 'Fermeture…' : 'Fermer ce Wi-Fi'}
           </button>
-          <p className={styles.note}>Nanar le referme aussi en partant.</p>
+          <p className={styles.note}>
+            Il se ferme aussi quand tu fermes Nanar, et Windows le ferme tout seul si aucun appareil
+            ne s’y connecte pendant quelques minutes.
+          </p>
         </>
       ) : (
         <>
+          <div className={styles.step} data-wide>
+            {remote}
+            <div>
+              <p className={styles.settingTitle}>Rien ne s’ouvre après avoir scanné ?</p>
+              <ul className={styles.checks}>
+                <li>Le téléphone et le PC doivent être sur le même Wi-Fi.</li>
+                <li>
+                  Pare-feu : quand Windows a posé la question, il fallait autoriser Nanar. Vérifie
+                  dans « Pare-feu Windows › Autoriser une application » que Nanar est coché pour les
+                  réseaux privés et publics.
+                </li>
+                <li>Certains Wi-Fi, surtout à l’hôtel, isolent les appareils : voici la parade.</li>
+              </ul>
+            </div>
+          </div>
+          <h3 className={styles.settingTitle}>Mode hôtel</h3>
+          <p className={styles.lead}>
+            Nanar ouvre un Wi-Fi à lui, que ton téléphone rejoint d’un scan. Le PC reste connecté à
+            Internet et partage sa connexion.
+          </p>
           <button
             type="button"
             data-nav
@@ -97,9 +134,11 @@ export function Hotel({ hotspot, onBack }: { hotspot: State['hotspot']; onBack: 
             disabled={busy || !hotspot.available}
             onClick={() => turn(true)}
           >
-            {busy ? 'Ouverture…' : 'Ouvrir le Wi-Fi de Nanar'}
+            {busy ? 'Ouverture…' : 'Ouvrir un Wi-Fi Nanar'}
           </button>
-          {!hotspot.available && !error && <p className={styles.note}>{MESSAGES.no_internet}</p>}
+          {!hotspot.available && !error && (
+            <p className={styles.note}>{MESSAGES[hotspot.code ?? 'no_internet']}</p>
+          )}
         </>
       )}
       {error && (
